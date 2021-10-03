@@ -1,5 +1,7 @@
 # bl602-ws2811
-This is a repo for testing WS2811 strips with custom animations while learning the embedded-hal for rust.
+This is a repo for testing WS2811 strips with custom animations while learning the embedded-hal for rust. 
+
+This is based on https://github.com/9names/bl602-rust-example but all new code is my own and to be licensed under the GPLv3 instead of the original repo's MIT licensing.
 
 It will use animations similar in nature to the lighting_control C library I built for the oMIDItone v2: https://github.com/kiyoshigawa/oMIDItone_Controller_V2
 

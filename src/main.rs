@@ -50,9 +50,9 @@ const ZERO: bool = false;
 const CORE_PERIOD_NS: f32 = 6.25;
 
 // Timing values for our 800kHz WS2811 Strips in nanoseconds:
-const WS2811_0H_TIME_NS: u32 = 350;
-const WS2811_1H_TIME_NS: u32 = 1200;
-const WS2811_FULL_CYCLE_TIME_NS: u32 = 2500;
+const WS2811_0H_TIME_NS: u32 = 200;
+const WS2811_1H_TIME_NS: u32 = 600;
+const WS2811_FULL_CYCLE_TIME_NS: u32 = 1250;
 
 // Timing Values converted to equivalent clock cycle values:
 const WS2811_0H_TIME_CLOCKS: u64 = (WS2811_0H_TIME_NS as f32 / CORE_PERIOD_NS) as u64;
@@ -221,7 +221,8 @@ impl<'a, const NUM_LEDS: usize> LogicalStrip<'a, NUM_LEDS> {
                 //the base is the 0th bit of that byte's index in terms of total bits:
                 let base = i * 8;
                 for bit in 0..8_u8 {
-                    bit_buffer[base + bit as usize] = match (byte >> bit) & 0x01 {
+                    //have to use (7 - bit) so it sends MSB first:
+                    bit_buffer[base + (7 - bit) as usize] = match (byte >> bit) & 0x01 {
                         0x01 => ONE,
                         0x00 => ZERO,
                         _ => unreachable!(),
@@ -297,7 +298,7 @@ fn main() -> ! {
         clocks,
     );
 
-    serial.write_str("Debug Serial Initializes...\r\n").ok();
+    serial.write_str("Debug Serial Initialized...\r\n").ok();
 
     // make sure the pin numbers here match the const pin numbers and macros above and in pins.rs:
     let closet_led_control_gpio = gpio_pins.pin0.into_pull_down_output();
@@ -315,21 +316,40 @@ fn main() -> ! {
     let mut color = c::C_RED;
     office_strip.set_strip_to_solid_color(color);
     office_strip.send_all_sequential(&mut pins);
-    d.delay_ms(10000).ok();
+    d.delay_ms(1000).ok();
     color = c::C_GREEN;
     office_strip.set_strip_to_solid_color(color);
     office_strip.send_all_sequential(&mut pins);
-    d.delay_ms(10000).ok();
+    d.delay_ms(1000).ok();
     color = c::C_BLUE;
     office_strip.set_strip_to_solid_color(color);
     office_strip.send_all_sequential(&mut pins);
-    d.delay_ms(10000).ok();
+    d.delay_ms(1000).ok();
 
     loop {
-        for color in c::R_ROYGBIV.colors.iter().take(c::R_ROYGBIV.num_colors) {
-            office_strip.set_strip_to_solid_color(color.unwrap());
-            office_strip.send_all_sequential(&mut pins);
-            d.delay_ms(1000).ok();
-        }
+        // for (i, color) in c::R_ROYGBIV
+        //     .colors
+        //     .iter()
+        //     .take(c::R_ROYGBIV.num_colors)
+        //     .enumerate()
+        // {
+        //     for j in 0..100 {
+        //         let current_color = color.unwrap_or(c::C_OFF);
+        //         let next_color: c::Color;
+        //         if i != c::R_ROYGBIV.num_colors - 1 {
+        //             next_color = c::R_ROYGBIV.colors[i + 1].unwrap_or(c::C_OFF);
+        //         } else {
+        //             next_color = c::R_ROYGBIV.colors[0].unwrap_or(c::C_OFF);
+        //         }
+        //         let intermediate_color =
+        //             c::Color::color_lerp(j as i32, 0, 100, current_color, next_color);
+        //         office_strip.set_strip_to_solid_color(intermediate_color);
+        //         office_strip.send_all_sequential(&mut pins);
+        //         d.delay_ms(10).ok();
+        //     }
+        // }
+        office_strip.set_strip_to_solid_color(c::Color::new(9, 3, 5));
+        office_strip.send_all_sequential(&mut pins);
+        d.delay_ms(1000).ok();
     }
 }

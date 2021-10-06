@@ -9,15 +9,19 @@ use crate::colors as c;
 use crate::pins as p;
 use bl602_hal as hal;
 use core::fmt::Write;
+use core::mem::MaybeUninit;
 use embedded_hal::delay::blocking::DelayMs;
-use embedded_hal::digital::blocking::OutputPin;
+use embedded_hal::digital::blocking::{OutputPin, ToggleableOutputPin};
+use embedded_time::duration::Milliseconds;
 use hal::{
     clock::{Strict, SysclkFreq, UART_PLL_FREQ},
     delay::McycleDelay,
     gpio::{Output, PullDown},
+    interrupts::*,
     pac,
     prelude::*,
     serial::*,
+    timer::*,
 };
 use panic_halt as _;
 
@@ -105,6 +109,18 @@ enum ColorOrder {
     GBR,
     BRG,
     BGR,
+}
+
+// a timer-based GPIO pin to control for testing:
+static mut GPIO5: MaybeUninit<hal::gpio::Pin5<Output<PullDown>>> = MaybeUninit::uninit();
+static mut TIMER_CH0: MaybeUninit<hal::timer::ConfiguredTimerChannel0> = MaybeUninit::uninit();
+
+fn get_gpio5() -> &'static mut hal::gpio::Pin5<Output<PullDown>> {
+    unsafe { &mut *GPIO5.as_mut_ptr() }
+}
+
+fn get_timer_ch0() -> &'static mut hal::timer::ConfiguredTimerChannel0 {
+    unsafe { &mut *TIMER_CH0.as_mut_ptr() }
 }
 
 const fn get_total_num_leds(strips: &[WS2811PhysicalStrip]) -> usize {
@@ -310,6 +326,27 @@ fn main() -> ! {
         p3: door_led_control_gpio,
     };
 
+    // timer-controlled blinky LED for testing:
+    let mut gpio5 = gpio_pins.pin5.into_pull_down_output();
+    gpio5.set_low().unwrap();
+
+    let timers = dp.TIMER.split();
+    let timer_ch0 = timers
+        .channel0
+        .set_clock_source(ClockSource::Clock1Khz, 1_000_u32.Hz());
+    timer_ch0.enable_match0_interrupt();
+    timer_ch0.set_preload_value(Milliseconds::new(0));
+    timer_ch0.set_preload(hal::timer::Preload::PreloadMatchComparator0);
+    timer_ch0.set_match0(Milliseconds::new(1000_u32));
+    timer_ch0.enable();
+
+    unsafe {
+        *(GPIO5.as_mut_ptr()) = gpio5;
+        *(TIMER_CH0.as_mut_ptr()) = timer_ch0;
+    }
+
+    enable_interrupt(Interrupt::TimerCh0);
+
     // Create a blocking delay function based on the current cpu frequency
     let mut d = bl602_hal::delay::McycleDelay::new(clocks.sysclk().0);
 
@@ -352,4 +389,19 @@ fn main() -> ! {
         office_strip.send_all_sequential(&mut pins);
         d.delay_ms(1000).ok();
     }
+}
+
+#[allow(non_snake_case)]
+#[no_mangle]
+fn TimerCh0(_trap_frame: &mut TrapFrame) {
+    disable_interrupt(Interrupt::TimerCh0);
+    get_timer_ch0().disable();
+
+    clear_interrupt(Interrupt::TimerCh0);
+    get_timer_ch0().clear_match0_interrupt();
+
+    get_gpio5().toggle().unwrap();
+
+    get_timer_ch0().enable();
+    enable_interrupt(Interrupt::TimerCh0);
 }

@@ -4,12 +4,13 @@
 pub mod animations;
 pub mod colors;
 pub mod pins;
+
 use crate::animations as a;
 use crate::colors as c;
 use crate::pins as p;
 use bl602_hal as hal;
+use core::cell::RefCell;
 use core::fmt::Write;
-use core::mem::MaybeUninit;
 use embedded_hal::delay::blocking::DelayMs;
 use embedded_hal::digital::blocking::{OutputPin, ToggleableOutputPin};
 use embedded_time::duration::Milliseconds;
@@ -24,6 +25,7 @@ use hal::{
     timer::*,
 };
 use panic_halt as _;
+use riscv::interrupt::Mutex;
 
 /// macro to add Push trait to gpio pins:
 /// this wraps the pins' set_high() and set_low() functions in our_set_* wrappers.
@@ -111,17 +113,11 @@ enum ColorOrder {
     BGR,
 }
 
-// a timer-based GPIO pin to control for testing:
-static mut GPIO5: MaybeUninit<hal::gpio::Pin5<Output<PullDown>>> = MaybeUninit::uninit();
-static mut TIMER_CH0: MaybeUninit<hal::timer::ConfiguredTimerChannel0> = MaybeUninit::uninit();
-
-fn get_gpio5() -> &'static mut hal::gpio::Pin5<Output<PullDown>> {
-    unsafe { &mut *GPIO5.as_mut_ptr() }
-}
-
-fn get_timer_ch0() -> &'static mut hal::timer::ConfiguredTimerChannel0 {
-    unsafe { &mut *TIMER_CH0.as_mut_ptr() }
-}
+// a timer-interrupt-based GPIO pin blinky setup:
+type LedPin = hal::gpio::Pin5<Output<PullDown>>;
+type LedTimer = hal::timer::ConfiguredTimerChannel0;
+static G_GPIO5: Mutex<RefCell<Option<LedPin>>> = Mutex::new(RefCell::new(None));
+static G_TIMER_CH0: Mutex<RefCell<Option<LedTimer>>> = Mutex::new(RefCell::new(None));
 
 const fn get_total_num_leds(strips: &[WS2811PhysicalStrip]) -> usize {
     let mut index = 0;
@@ -328,7 +324,7 @@ fn main() -> ! {
 
     // timer-controlled blinky LED for testing:
     let mut gpio5 = gpio_pins.pin5.into_pull_down_output();
-    gpio5.set_low().unwrap();
+    gpio5.set_high().unwrap();
 
     let timers = dp.TIMER.split();
     let timer_ch0 = timers
@@ -338,13 +334,16 @@ fn main() -> ! {
     timer_ch0.set_preload_value(Milliseconds::new(0));
     timer_ch0.set_preload(hal::timer::Preload::PreloadMatchComparator0);
     timer_ch0.set_match0(Milliseconds::new(1000_u32));
-    timer_ch0.enable();
 
-    unsafe {
-        *(GPIO5.as_mut_ptr()) = gpio5;
-        *(TIMER_CH0.as_mut_ptr()) = timer_ch0;
-    }
+    //move the pin & Timer to the global Mutex container:
+    riscv::interrupt::free(|cs| *G_GPIO5.borrow(cs).borrow_mut() = Some(gpio5));
+    riscv::interrupt::free(|cs| *G_TIMER_CH0.borrow(cs).borrow_mut() = Some(timer_ch0));
 
+    //only enable the timer/interrupt after it's been borrowed in the global scope:
+    riscv::interrupt::free(|cs| {
+        let timer = G_TIMER_CH0.borrow(cs).borrow_mut();
+        timer.as_ref().unwrap().enable();
+    });
     enable_interrupt(Interrupt::TimerCh0);
 
     // Create a blocking delay function based on the current cpu frequency
@@ -395,13 +394,20 @@ fn main() -> ! {
 #[no_mangle]
 fn TimerCh0(_trap_frame: &mut TrapFrame) {
     disable_interrupt(Interrupt::TimerCh0);
-    get_timer_ch0().disable();
-
     clear_interrupt(Interrupt::TimerCh0);
-    get_timer_ch0().clear_match0_interrupt();
 
-    get_gpio5().toggle().unwrap();
+    //since the free() disables interrupts, we only need to clear the match0:
+    riscv::interrupt::free(|cs| {
+        let timer = G_TIMER_CH0.borrow(cs).replace(None);
+        timer.as_ref().unwrap().clear_match0_interrupt();
+    });
 
-    get_timer_ch0().enable();
+    riscv::interrupt::free(|cs| {
+        if let Some(mut gpio) = G_GPIO5.borrow(cs).replace(None) {
+            //it doesn't actually toggle the LED PIN, but it's stopped crashing at least.
+            gpio.toggle().ok();
+        }
+    });
+
     enable_interrupt(Interrupt::TimerCh0);
 }

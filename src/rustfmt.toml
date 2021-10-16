@@ -1,0 +1,4 @@
+max_width = 100
+fn_call_width = 90
+struct_lit_width = 90
+struct_variant_width = 90

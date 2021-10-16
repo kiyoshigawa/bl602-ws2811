@@ -9,6 +9,6 @@ Initially I will be manually handling the timings for the WS2811 strips using cl
 
 This is all being built and tested on Windows using the latest stable rust compiler. I'm avoiding nightly builds and unstable features for the time being.
 
-To flash your BL602, you'll need it to be running a bootloader, and be in flashing mode. For my Pinecone BL602 board, I have to swap the jumper on pin IO8 from L to H and reset the board to enter bootloader mode. Once it's in bootloader mode, just run `cargo blflash --port=COMXX` and it will compile and upload the code. Then to actually run the program I need to swap the jumper back to L and reset it again.
+To flash your BL602, you'll need it to be running a bootloader, and be in flashing mode. For my Pinecone BL602 board, I have to swap the jumper on pin IO8 from L to H and reset the board to enter bootloader mode. Once it's in bootloader mode, just run `cargo blflash --release --port=COMXX` and it will compile and upload the code. Then to actually run the program I need to swap the jumper back to L and reset it again.
 
 I would eventually like to switch to using the [blash flasher](https://github.com/bjoernQ/blash) but for now I'm going to keep using what works rather than fight the toolchain before I even have LEDs working.

@@ -3,20 +3,23 @@
 
 pub mod animations;
 pub mod colors;
-pub mod pins;
+pub mod leds;
 
 use crate::animations as a;
 use crate::colors as c;
-use crate::pins as p;
+use crate::leds::ws28xx as strip;
+
+use bitvec::prelude::*;
+use bitvec::ptr::Mut;
+use bitvec::slice::BitSlice;
 use bl602_hal as hal;
-use core::cell::RefCell;
+use core::cell::{Ref, RefCell};
 use core::fmt::Write;
-use embedded_hal::delay::blocking::DelayMs;
+use core::ops::DerefMut;
 use embedded_hal::digital::blocking::{OutputPin, ToggleableOutputPin};
-use embedded_time::duration::Milliseconds;
+use embedded_time::{duration::*, rate::*};
 use hal::{
     clock::{Strict, SysclkFreq, UART_PLL_FREQ},
-    delay::McycleDelay,
     gpio::{Output, PullDown},
     interrupts::*,
     pac,
@@ -24,112 +27,64 @@ use hal::{
     serial::*,
     timer::*,
 };
+use heapless::String;
 use panic_halt as _;
 use riscv::interrupt::Mutex;
 
-/// macro to add Push trait to gpio pins:
-/// this wraps the pins' set_high() and set_low() functions in our_set_* wrappers.
-macro_rules! push {
-    ($p:ty) => {
-        impl p::Push for $p {
-            fn our_set_low(&mut self) {
-                self.set_low().unwrap();
-            }
-            fn our_set_high(&mut self) {
-                self.set_high().unwrap();
-            }
-        }
-    };
-}
+// Hardware specific config for tim's office.
+pub const CLOSET_STRIP_PIN: u8 = 0;
+pub const WINDOW_STRIP_PIN: u8 = 1;
+pub const DOOR_STRIP_PIN: u8 = 3;
 
-// make sure to add the pins you're using here and in pins.rs:
-push!(bl602_hal::gpio::Pin0<Output<PullDown>>);
-push!(bl602_hal::gpio::Pin1<Output<PullDown>>);
-push!(bl602_hal::gpio::Pin3<Output<PullDown>>);
+// Typedefs to make the code below easier to read:
+// Make sure the pin numbers above match the hardware pin numbers here
+type LedPinCloset = hal::gpio::Pin0<Output<PullDown>>;
+type LedPinWindow = hal::gpio::Pin1<Output<PullDown>>;
+type LedPinDoor = hal::gpio::Pin3<Output<PullDown>>;
+type LedTimer = hal::timer::ConfiguredTimerChannel0;
 
-// readability consts:
-const ONE: bool = true;
-const ZERO: bool = false;
-
-// Based on the clock speed of 160MHz as noted in the main() function below,
-// one clock is
-const CORE_PERIOD_NS: f32 = 6.25;
-
-// Timing values for our 800kHz WS2811 Strips in nanoseconds:
-const WS2811_0H_TIME_NS: u32 = 200;
-const WS2811_1H_TIME_NS: u32 = 600;
-const WS2811_FULL_CYCLE_TIME_NS: u32 = 1250;
-
-// Timing Values converted to equivalent clock cycle values:
-const WS2811_0H_TIME_CLOCKS: u64 = (WS2811_0H_TIME_NS as f32 / CORE_PERIOD_NS) as u64;
-const WS2811_1H_TIME_CLOCKS: u64 = (WS2811_1H_TIME_NS as f32 / CORE_PERIOD_NS) as u64;
-const WS2811_FULL_CYCLE_CLOCKS: u64 = (WS2811_FULL_CYCLE_TIME_NS as f32 / CORE_PERIOD_NS) as u64;
-
-// This is how much to offset from the clock cycle measurement before actually sending data to the strips
-// the value was determined experimentally, tweak as needed for consistency
-const SEND_START_OFFSET_DELAY_CLOCKS: u64 = 50000;
+// Set up global container for variables that will need to be accessed inside of the timer interrupt
+static G_LED_PIN_CLOSET: Mutex<RefCell<Option<LedPinCloset>>> = Mutex::new(RefCell::new(None));
+static G_LED_PIN_WINDOW: Mutex<RefCell<Option<LedPinWindow>>> = Mutex::new(RefCell::new(None));
+static G_LED_PIN_DOOR: Mutex<RefCell<Option<LedPinDoor>>> = Mutex::new(RefCell::new(None));
+static G_LED_TIMER: Mutex<RefCell<Option<LedTimer>>> = Mutex::new(RefCell::new(None));
 
 // The number of LEDs on each strip:
 const NUM_LEDS_WINDOW_STRIP: usize = 74;
 const NUM_LEDS_DOOR_STRIP: usize = 61;
 const NUM_LEDS_CLOSET_STRIP: usize = 34;
-const MAX_SINGLE_STRIP_BYTE_BUFFER_LENGTH: usize = get_single_strip_buffer_max_length(&ALL_STRIPS);
-const MAX_SINGLE_STRIP_BIT_BUFFER_LENGTH: usize = MAX_SINGLE_STRIP_BYTE_BUFFER_LENGTH * 8;
 
 // individual strips:
-const CLOSET_STRIP: WS2811PhysicalStrip = WS2811PhysicalStrip {
-    pin: p::CLOSET_STRIP_PIN,
+const CLOSET_STRIP: strip::PhysicalStrip = strip::PhysicalStrip {
+    pin: CLOSET_STRIP_PIN,
     led_count: NUM_LEDS_CLOSET_STRIP,
     reversed: false,
-    _color_order: ColorOrder::BRG,
+    color_order: strip::ColorOrder::BRG,
 };
-const WINDOW_STRIP: WS2811PhysicalStrip = WS2811PhysicalStrip {
-    pin: p::WINDOW_STRIP_PIN,
+const WINDOW_STRIP: strip::PhysicalStrip = strip::PhysicalStrip {
+    pin: WINDOW_STRIP_PIN,
     led_count: NUM_LEDS_WINDOW_STRIP,
     reversed: false,
-    _color_order: ColorOrder::BRG,
+    color_order: strip::ColorOrder::BRG,
 };
-const DOOR_STRIP: WS2811PhysicalStrip = WS2811PhysicalStrip {
-    pin: p::DOOR_STRIP_PIN,
+const DOOR_STRIP: strip::PhysicalStrip = strip::PhysicalStrip {
+    pin: DOOR_STRIP_PIN,
     led_count: NUM_LEDS_DOOR_STRIP,
     reversed: true,
-    _color_order: ColorOrder::BRG,
+    color_order: strip::ColorOrder::BRG,
 };
 
 // combined strip group:
-const ALL_STRIPS: [WS2811PhysicalStrip; 3] = [CLOSET_STRIP, WINDOW_STRIP, DOOR_STRIP];
+const ALL_STRIPS: [strip::PhysicalStrip; 3] = [CLOSET_STRIP, WINDOW_STRIP, DOOR_STRIP];
+
+// The number of LEDs on each strip:
+const MAX_SINGLE_STRIP_BYTE_BUFFER_LENGTH: usize = get_single_strip_buffer_max_length(&ALL_STRIPS);
+const MAX_SINGLE_STRIP_BIT_BUFFER_LENGTH: usize = MAX_SINGLE_STRIP_BYTE_BUFFER_LENGTH * 8;
 
 // calculate the total number of LEDs from the above values:
 const NUM_LEDS: usize = get_total_num_leds(&ALL_STRIPS);
 
-#[allow(dead_code)]
-#[allow(clippy::upper_case_acronyms)]
-enum ColorOrder {
-    RGB,
-    RBG,
-    GRB,
-    GBR,
-    BRG,
-    BGR,
-}
-
-// a timer-interrupt-based GPIO pin blinky setup:
-type LedPin = hal::gpio::Pin5<Output<PullDown>>;
-type LedTimer = hal::timer::ConfiguredTimerChannel0;
-static G_GPIO5: Mutex<RefCell<Option<LedPin>>> = Mutex::new(RefCell::new(None));
-static G_TIMER_CH0: Mutex<RefCell<Option<LedTimer>>> = Mutex::new(RefCell::new(None));
-
-const fn get_total_num_leds(strips: &[WS2811PhysicalStrip]) -> usize {
-    let mut index = 0;
-    let mut total = 0;
-    while index < strips.len() {
-        total += strips[index].led_count;
-        index += 1;
-    }
-    total
-}
-
-const fn get_single_strip_buffer_max_length(strips: &[WS2811PhysicalStrip]) -> usize {
+const fn get_single_strip_buffer_max_length(strips: &[strip::PhysicalStrip]) -> usize {
     let mut max_len = 0;
     let mut index = 0;
     while index < strips.len() {
@@ -142,148 +97,21 @@ const fn get_single_strip_buffer_max_length(strips: &[WS2811PhysicalStrip]) -> u
     max_len * 3
 }
 
-struct WS2811PhysicalStrip {
-    pin: u8,
-    led_count: usize,
-    reversed: bool,
-    _color_order: ColorOrder,
-}
-
-impl WS2811PhysicalStrip {
-    fn send_bits<P1, P2, P3>(&self, pins: &mut p::PinControl<P1, P2, P3>, timings: &[(u64, u64)])
-    where
-        P1: OutputPin + p::Push,
-        P2: OutputPin + p::Push,
-        P3: OutputPin + p::Push,
-    {
-        for timing in timings {
-            delay_until(timing.0);
-            p::PinControl::push_high(self.pin, pins);
-            delay_until(timing.1);
-            p::PinControl::pull_low(self.pin, pins);
-        }
+const fn get_total_num_leds(strips: &[strip::PhysicalStrip]) -> usize {
+    let mut index = 0;
+    let mut total = 0;
+    while index < strips.len() {
+        total += strips[index].led_count;
+        index += 1;
     }
-}
-
-struct LogicalStrip<'a, const NUM_LEDS: usize> {
-    color_buffer: [c::Color; NUM_LEDS],
-    strips: &'a [WS2811PhysicalStrip],
-    animation: a::Animation,
-}
-
-impl<'a, const NUM_LEDS: usize> LogicalStrip<'a, NUM_LEDS> {
-    fn new(strips: &'a [WS2811PhysicalStrip], animation: a::Animation) -> Self {
-        LogicalStrip::<NUM_LEDS> {
-            color_buffer: [c::Color::default(); NUM_LEDS],
-            strips,
-            animation,
-        }
-    }
-
-    //this sets the color value in the color array at index:
-    fn set_color_at_index(&mut self, index: usize, color: c::Color) {
-        self.color_buffer[index].r = color.r;
-        self.color_buffer[index].g = color.g;
-        self.color_buffer[index].b = color.b;
-    }
-
-    // this fills the entire strip with a single color:
-    fn set_strip_to_solid_color(&mut self, color: c::Color) {
-        for i in 0..self.color_buffer.len() {
-            self.set_color_at_index(i, color);
-        }
-    }
-
-    // this will iterate over all the strips and send the led data in series:
-    fn send_all_sequential<P1, P2, P3>(&self, pins: &mut p::PinControl<P1, P2, P3>)
-    where
-        P1: OutputPin + p::Push,
-        P2: OutputPin + p::Push,
-        P3: OutputPin + p::Push,
-    {
-        let mut start_index = 0;
-
-        for strip in self.strips {
-            let end_index = start_index + strip.led_count;
-
-            // generate byte array from color array (taking care of color order)
-            let current_strip_colors = &self.color_buffer[start_index..end_index];
-            let byte_count = strip.led_count * 3;
-            let bit_count = byte_count * 8;
-            let mut byte_buffer = [0_u8; MAX_SINGLE_STRIP_BYTE_BUFFER_LENGTH];
-            if strip.reversed {
-                for (i, color) in current_strip_colors.iter().rev().enumerate() {
-                    let base = i * 3;
-                    byte_buffer[base] = color.g;
-                    byte_buffer[base + 1] = color.r;
-                    byte_buffer[base + 2] = color.b;
-                }
-            } else {
-                for (i, color) in current_strip_colors.iter().enumerate() {
-                    let base = i * 3;
-                    byte_buffer[base] = color.g;
-                    byte_buffer[base + 1] = color.r;
-                    byte_buffer[base + 2] = color.b;
-                }
-            }
-
-            // from byte array to bit array
-            let mut bit_buffer = [ZERO; MAX_SINGLE_STRIP_BIT_BUFFER_LENGTH];
-            for (i, byte) in byte_buffer.iter().take(byte_count).enumerate() {
-                //the base is the 0th bit of that byte's index in terms of total bits:
-                let base = i * 8;
-                for bit in 0..8_u8 {
-                    //have to use (7 - bit) so it sends MSB first:
-                    bit_buffer[base + (7 - bit) as usize] = match (byte >> bit) & 0x01 {
-                        0x01 => ONE,
-                        0x00 => ZERO,
-                        _ => unreachable!(),
-                    };
-                }
-            }
-
-            // from bit array to timing array
-            let mut timings = [(0_u64, 0_u64); MAX_SINGLE_STRIP_BIT_BUFFER_LENGTH];
-            for (i, &bit) in bit_buffer.iter().take(bit_count).enumerate() {
-                let bit_timing = match bit {
-                    ONE => WS2811_1H_TIME_CLOCKS,
-                    ZERO => WS2811_0H_TIME_CLOCKS,
-                };
-                let base_time = WS2811_FULL_CYCLE_CLOCKS * i as u64;
-                timings[i] = (base_time, base_time + bit_timing);
-            }
-
-            // add clock + offset to timing array
-            let offset_clocks = SEND_START_OFFSET_DELAY_CLOCKS;
-            let clock_and_offset = McycleDelay::get_cycle_count() + offset_clocks;
-            for timing in timings.iter_mut() {
-                timing.0 += clock_and_offset;
-                timing.1 += clock_and_offset;
-            }
-
-            // call send bits and send the timing array
-            strip.send_bits(pins, &timings);
-
-            start_index = end_index;
-        }
-    }
-}
-
-// this is a delay function that will prevent progress to a specified number of
-// clock cycles as measured by the get_cycle_count() function.
-fn delay_until(clocks: u64) {
-    loop {
-        if McycleDelay::get_cycle_count() > clocks {
-            break;
-        }
-    }
+    total
 }
 
 #[riscv_rt::entry]
 fn main() -> ! {
     // make the logical strip:
-    let initial_animation = a::Animation::new(NUM_LEDS);
-    let mut office_strip = LogicalStrip::<NUM_LEDS>::new(&ALL_STRIPS, initial_animation);
+    let _initial_animation = a::Animation::new(NUM_LEDS);
+    let mut office_strip = strip::LogicalStrip::<NUM_LEDS>::new(&ALL_STRIPS);
 
     let dp = pac::Peripherals::take().unwrap();
     let mut gpio_pins = dp.GLB.split();
@@ -312,81 +140,52 @@ fn main() -> ! {
 
     serial.write_str("Debug Serial Initialized...\r\n").ok();
 
-    // make sure the pin numbers here match the const pin numbers and macros above and in pins.rs:
-    let closet_led_control_gpio = gpio_pins.pin0.into_pull_down_output();
-    let window_led_control_gpio = gpio_pins.pin1.into_pull_down_output();
-    let door_led_control_gpio = gpio_pins.pin3.into_pull_down_output();
-    let mut pins = p::PinControl {
-        p1: closet_led_control_gpio,
-        p2: window_led_control_gpio,
-        p3: door_led_control_gpio,
-    };
+    // Make sure the pin numbers here match the const pin numbers on the strips:
+    let mut closet_led_pin: LedPinCloset = gpio_pins.pin0.into_pull_down_output();
+    let _ = closet_led_pin.set_low();
+    let mut window_led_pin: LedPinWindow = gpio_pins.pin1.into_pull_down_output();
+    let _ = window_led_pin.set_low();
+    let mut door_led_pin: LedPinDoor = gpio_pins.pin3.into_pull_down_output();
+    let _ = door_led_pin.set_low();
 
-    // timer-controlled blinky LED for testing:
-    let mut gpio5 = gpio_pins.pin5.into_pull_down_output();
-    gpio5.set_high().unwrap();
-
+    // Get the timer and initialize it to count up every clock cycle:
     let timers = dp.TIMER.split();
     let timer_ch0 = timers
         .channel0
-        .set_clock_source(ClockSource::Clock1Khz, 1_000_u32.Hz());
+        .set_clock_source(ClockSource::Fclk(&clocks), 8_000_000_u32.Hz());
+
     timer_ch0.enable_match0_interrupt();
-    timer_ch0.set_preload_value(Milliseconds::new(0));
-    timer_ch0.set_preload(hal::timer::Preload::PreloadMatchComparator0);
-    timer_ch0.set_match0(Milliseconds::new(1000_u32));
+    timer_ch0.set_match0(0.nanoseconds());
+    timer_ch0.enable_match1_interrupt();
+    timer_ch0.set_match1(1100.nanoseconds());
+    timer_ch0.enable_match2_interrupt();
+    timer_ch0.set_match2(5000.nanoseconds());
+    timer_ch0.set_preload_value(0.nanoseconds());
+    timer_ch0.set_preload(hal::timer::Preload::PreloadMatchComparator2);
+    timer_ch0.enable();
 
-    //move the pin & Timer to the global Mutex container:
-    riscv::interrupt::free(|cs| *G_GPIO5.borrow(cs).borrow_mut() = Some(gpio5));
-    riscv::interrupt::free(|cs| *G_TIMER_CH0.borrow(cs).borrow_mut() = Some(timer_ch0));
+    //move the gpio pins & Timer to the global Mutex containers:
+    riscv::interrupt::free(|cs| G_LED_TIMER.borrow(cs).replace(Some(timer_ch0)));
+    riscv::interrupt::free(|cs| G_LED_PIN_CLOSET.borrow(cs).replace(Some(closet_led_pin)));
+    riscv::interrupt::free(|cs| G_LED_PIN_WINDOW.borrow(cs).replace(Some(window_led_pin)));
+    riscv::interrupt::free(|cs| G_LED_PIN_DOOR.borrow(cs).replace(Some(door_led_pin)));
 
-    //only enable the timer/interrupt after it's been borrowed in the global scope:
-    riscv::interrupt::free(|cs| {
-        let timer = G_TIMER_CH0.borrow(cs).borrow_mut();
-        timer.as_ref().unwrap().enable();
-    });
+    //only enable the timer interrupt after it's been borrowed in the global scope:
     enable_interrupt(Interrupt::TimerCh0);
-
-    // Create a blocking delay function based on the current cpu frequency
-    let mut d = bl602_hal::delay::McycleDelay::new(clocks.sysclk().0);
 
     let mut color = c::C_RED;
     office_strip.set_strip_to_solid_color(color);
-    office_strip.send_all_sequential(&mut pins);
-    d.delay_ms(1000).ok();
+    //office_strip.send_all_sequential(&mut pins);
     color = c::C_GREEN;
     office_strip.set_strip_to_solid_color(color);
-    office_strip.send_all_sequential(&mut pins);
-    d.delay_ms(1000).ok();
+    //office_strip.send_all_sequential(&mut pins);
     color = c::C_BLUE;
     office_strip.set_strip_to_solid_color(color);
-    office_strip.send_all_sequential(&mut pins);
-    d.delay_ms(1000).ok();
+    //office_strip.send_all_sequential(&mut pins);
 
     loop {
-        // for (i, color) in c::R_ROYGBIV
-        //     .colors
-        //     .iter()
-        //     .take(c::R_ROYGBIV.num_colors)
-        //     .enumerate()
-        // {
-        //     for j in 0..100 {
-        //         let current_color = color.unwrap_or(c::C_OFF);
-        //         let next_color: c::Color;
-        //         if i != c::R_ROYGBIV.num_colors - 1 {
-        //             next_color = c::R_ROYGBIV.colors[i + 1].unwrap_or(c::C_OFF);
-        //         } else {
-        //             next_color = c::R_ROYGBIV.colors[0].unwrap_or(c::C_OFF);
-        //         }
-        //         let intermediate_color =
-        //             c::Color::color_lerp(j as i32, 0, 100, current_color, next_color);
-        //         office_strip.set_strip_to_solid_color(intermediate_color);
-        //         office_strip.send_all_sequential(&mut pins);
-        //         d.delay_ms(10).ok();
-        //     }
-        // }
         office_strip.set_strip_to_solid_color(c::Color::new(9, 3, 5));
-        office_strip.send_all_sequential(&mut pins);
-        d.delay_ms(1000).ok();
+        //office_strip.send_all_sequential(&mut pins);
     }
 }
 
@@ -396,17 +195,28 @@ fn TimerCh0(_trap_frame: &mut TrapFrame) {
     disable_interrupt(Interrupt::TimerCh0);
     clear_interrupt(Interrupt::TimerCh0);
 
-    //since the free() disables interrupts, we only need to clear the match0:
+    //since the free() disables interrupts, we can clear the match0 without enabling/disabling first:
     riscv::interrupt::free(|cs| {
-        let timer = G_TIMER_CH0.borrow(cs).replace(None);
-        timer.as_ref().unwrap().clear_match0_interrupt();
-    });
-
-    riscv::interrupt::free(|cs| {
-        if let Some(mut gpio) = G_GPIO5.borrow(cs).replace(None) {
-            //it doesn't actually toggle the LED PIN, but it's stopped crashing at least.
-            gpio.toggle().ok();
-        }
+        if let Some(timer) = G_LED_TIMER.borrow(cs).borrow_mut().deref_mut() {
+            if timer.is_match0() {
+                timer.clear_match0_interrupt();
+                if let Some(led_pin) = G_LED_PIN_CLOSET.borrow(cs).borrow_mut().deref_mut() {
+                    led_pin.set_high().ok();
+                }
+            }
+            if timer.is_match1() {
+                timer.clear_match1_interrupt();
+                if let Some(led_pin) = G_LED_PIN_CLOSET.borrow(cs).borrow_mut().deref_mut() {
+                    led_pin.set_low().ok();
+                }
+            }
+            if timer.is_match2() {
+                timer.clear_match2_interrupt();
+                if let Some(led_pin) = G_LED_PIN_CLOSET.borrow(cs).borrow_mut().deref_mut() {
+                    // led_pin.set_low().ok();
+                }
+            }
+        };
     });
 
     enable_interrupt(Interrupt::TimerCh0);

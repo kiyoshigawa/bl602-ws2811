@@ -8,3 +8,6 @@ runner = "cargo blflash --port=COM14"
 
 [build]
 target = "riscv32imac-unknown-none-elf"
+
+[alias]
+flash = ["--color=always", "blflash", "--release", "--port=COM14"]

@@ -7,11 +7,14 @@ edition = "2018"
 [dependencies]
 riscv-rt = "0.8.0"
 embedded-hal = "=1.0.0-alpha.5"
-bl602-hal = { git = "https://github.com/sipeed/bl602-hal", rev="dfc9946e79ea4dac18be11efce11d0592a8517fb" }
+# Only using the local copy while I am working on updating the timers in the hal:
+bl602-hal = { path = "../bl602-hal" }
 panic-halt = "0.2.0"
 riscv = "0.6.0"
 embedded-time = "0.12.0"
 nb = "1.0.0"
+bitvec = { version = "0.22.3", default-features = false }
+heapless = "0.7.7"
 
 # You probably don't want to use a debug build, but lots of people accidentally do
 # give the code at least a low level of optimization

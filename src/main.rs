@@ -17,6 +17,7 @@ use core::cell::{Ref, RefCell};
 use core::fmt::Write;
 use core::ops::DerefMut;
 use embedded_hal::digital::blocking::{OutputPin, ToggleableOutputPin};
+use embedded_hal::timer::nb::CountDown;
 use embedded_time::{duration::*, rate::*};
 use hal::{
     clock::{Strict, SysclkFreq, UART_PLL_FREQ},
@@ -27,9 +28,10 @@ use hal::{
     serial::*,
     timer::*,
 };
-use heapless::String;
+use nb::block;
 use panic_halt as _;
 use riscv::interrupt::Mutex;
+use riscv::register::medeleg::clear_load_page_fault;
 
 // Hardware specific config for tim's office.
 pub const CLOSET_STRIP_PIN: u8 = 0;
@@ -138,7 +140,7 @@ fn main() -> ! {
         clocks,
     );
 
-    serial.write_str("Debug Serial Initialized...\r\n").ok();
+    writeln!(serial, "Debug Serial Initialized...\r").ok();
 
     // Make sure the pin numbers here match the const pin numbers on the strips:
     let mut closet_led_pin: LedPinCloset = gpio_pins.pin0.into_pull_down_output();
@@ -150,42 +152,94 @@ fn main() -> ! {
 
     // Get the timer and initialize it to count up every clock cycle:
     let timers = dp.TIMER.split();
-    let timer_ch0 = timers
+    let mut timer_ch0 = timers
         .channel0
-        .set_clock_source(ClockSource::Fclk(&clocks), 8_000_000_u32.Hz());
-
-    timer_ch0.enable_match0_interrupt();
-    timer_ch0.set_match0(0.nanoseconds());
-    timer_ch0.enable_match1_interrupt();
-    timer_ch0.set_match1(1100.nanoseconds());
-    timer_ch0.enable_match2_interrupt();
-    timer_ch0.set_match2(5000.nanoseconds());
-    timer_ch0.set_preload_value(0.nanoseconds());
-    timer_ch0.set_preload(hal::timer::Preload::PreloadMatchComparator2);
-    timer_ch0.enable();
+        .set_clock_source(ClockSource::Fclk(&clocks), 160_000_000_u32.Hz());
 
     //move the gpio pins & Timer to the global Mutex containers:
-    riscv::interrupt::free(|cs| G_LED_TIMER.borrow(cs).replace(Some(timer_ch0)));
-    riscv::interrupt::free(|cs| G_LED_PIN_CLOSET.borrow(cs).replace(Some(closet_led_pin)));
-    riscv::interrupt::free(|cs| G_LED_PIN_WINDOW.borrow(cs).replace(Some(window_led_pin)));
-    riscv::interrupt::free(|cs| G_LED_PIN_DOOR.borrow(cs).replace(Some(door_led_pin)));
+    // riscv::interrupt::free(|cs| G_LED_TIMER.borrow(*cs).replace(Some(timer_ch0)));
+    // riscv::interrupt::free(|cs| G_LED_PIN_CLOSET.borrow(*cs).replace(Some(closet_led_pin)));
+    // riscv::interrupt::free(|cs| G_LED_PIN_WINDOW.borrow(*cs).replace(Some(window_led_pin)));
+    // riscv::interrupt::free(|cs| G_LED_PIN_DOOR.borrow(*cs).replace(Some(door_led_pin)));
 
     //only enable the timer interrupt after it's been borrowed in the global scope:
-    enable_interrupt(Interrupt::TimerCh0);
+    // enable_interrupt(Interrupt::TimerCh0);
 
-    let mut color = c::C_RED;
-    office_strip.set_strip_to_solid_color(color);
+    // let mut color = c::C_RED;
+    // office_strip.set_strip_to_solid_color(color);
     //office_strip.send_all_sequential(&mut pins);
-    color = c::C_GREEN;
-    office_strip.set_strip_to_solid_color(color);
+    // color = c::C_GREEN;
+    // office_strip.set_strip_to_solid_color(color);
     //office_strip.send_all_sequential(&mut pins);
-    color = c::C_BLUE;
-    office_strip.set_strip_to_solid_color(color);
+    // color = c::C_BLUE;
+    // office_strip.set_strip_to_solid_color(color);
     //office_strip.send_all_sequential(&mut pins);
 
+    //
+    // let mut index = 0_u64;
+    //
+    // #[derive(Default, Debug, Clone, Copy)]
+    // struct LoopTimes {
+    //     index: u64,
+    //     target: Nanoseconds<u64>,
+    //     time: Nanoseconds<u64>,
+    // }
+
+    // let mut loop_array: [LoopTimes; 10] = [LoopTimes::default(); 10];
     loop {
-        office_strip.set_strip_to_solid_color(c::Color::new(9, 3, 5));
-        //office_strip.send_all_sequential(&mut pins);
+        // timer_ch0
+        //     // .start((strip::StripTimings::WS2812_ADAFRUIT.full_cycle / 3).nanoseconds())
+        //     .start(200.nanoseconds())
+        //     .ok();
+
+        periodic_start(
+            &mut timer_ch0,
+            (strip::StripTimings::WS2812_ADAFRUIT.full_cycle / 3).nanoseconds(),
+        );
+        closet_led_pin.set_low().ok();
+        for _ in 0..900 {
+            faster_wait(&mut timer_ch0);
+        }
+        // let mut loop_times = 0_u64;
+        for i in 0..96 {
+            // office_strip.set_strip_to_solid_color(c::Color::new(9, 3, 5));
+            //office_strip.send_all_sequential(&mut pins);
+            closet_led_pin.set_high().ok();
+            faster_wait(&mut timer_ch0);
+            faster_wait(&mut timer_ch0);
+            // block!(timer_ch0.wait()).ok();
+            closet_led_pin.set_low().ok();
+            faster_wait(&mut timer_ch0);
+            // block!(timer_ch0.wait()).ok();
+            // block!(timer_ch0.wait()).ok();
+            // index += 1;
+            // loop_array[i].index = index;
+            // let _ = timer_ch0.current_ticks();
+            // loop_array[i].ticks = timer_ch0.current_ticks();
+            // loop_array[i].time = timer_ch0.current_time();
+            // let _ = timer_ch0.current_time();
+        }
+        //
+        // for LoopTimes { index, target, time } in loop_array {
+        //     writeln!(serial, "Loop: {}\t\tTarget: {}\t\tTime: {}\r", index, target, time).ok();
+        // }
+    }
+}
+fn periodic_start(timer: &mut ConfiguredTimerChannel0, time: impl Into<Nanoseconds<u64>>) {
+    let time: Nanoseconds<u64> = time.into();
+    timer.set_match2(time);
+    timer.enable_match2_interrupt();
+    timer.set_preload_value(0.nanoseconds());
+    timer.set_preload(Preload::PreloadMatchComparator2);
+    timer.enable();
+}
+
+fn faster_wait(timer: &mut ConfiguredTimerChannel0) {
+    loop {
+        if timer.is_match2() {
+            timer.clear_match2_interrupt();
+            break;
+        }
     }
 }
 
@@ -196,28 +250,27 @@ fn TimerCh0(_trap_frame: &mut TrapFrame) {
     clear_interrupt(Interrupt::TimerCh0);
 
     //since the free() disables interrupts, we can clear the match0 without enabling/disabling first:
-    riscv::interrupt::free(|cs| {
-        if let Some(timer) = G_LED_TIMER.borrow(cs).borrow_mut().deref_mut() {
-            if timer.is_match0() {
-                timer.clear_match0_interrupt();
-                if let Some(led_pin) = G_LED_PIN_CLOSET.borrow(cs).borrow_mut().deref_mut() {
-                    led_pin.set_high().ok();
-                }
-            }
-            if timer.is_match1() {
-                timer.clear_match1_interrupt();
-                if let Some(led_pin) = G_LED_PIN_CLOSET.borrow(cs).borrow_mut().deref_mut() {
-                    led_pin.set_low().ok();
-                }
-            }
-            if timer.is_match2() {
-                timer.clear_match2_interrupt();
-                if let Some(led_pin) = G_LED_PIN_CLOSET.borrow(cs).borrow_mut().deref_mut() {
-                    // led_pin.set_low().ok();
-                }
-            }
-        };
-    });
-
+    // riscv::interrupt::free(|cs| {
+    //     if let Some(timer) = G_LED_TIMER.borrow(*cs).borrow_mut().deref_mut() {
+    //         // if timer.is_match0() {
+    //         //     timer.clear_match0_interrupt();
+    //         //     if let Some(led_pin) = G_LED_PIN_CLOSET.borrow(*cs).borrow_mut().deref_mut() {
+    //         //         led_pin.set_high().ok();
+    //         //     }
+    //         // }
+    //         // if timer.is_match1() {
+    //         //     timer.clear_match1_interrupt();
+    //         //     if let Some(led_pin) = G_LED_PIN_CLOSET.borrow(*cs).borrow_mut().deref_mut() {
+    //         //         led_pin.set_low().ok();
+    //         //     }
+    //         // }
+    //         // if timer.is_match2() {
+    //         //     timer.clear_match2_interrupt();
+    //         //     if let Some(led_pin) = G_LED_PIN_CLOSET.borrow(*cs).borrow_mut().deref_mut() {
+    //         //         led_pin.set_low().ok();
+    //         //     }
+    //         // }
+    //     };
+    // });
     enable_interrupt(Interrupt::TimerCh0);
 }

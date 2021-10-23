@@ -1,8 +1,8 @@
 pub mod ws28xx {
     use crate::colors as c;
-
+    use crate::pins as p;
+    use crate::pins::PinControl;
     use bitvec::prelude::*;
-    use bl602_hal::gpio::{Output, PullDown};
     use embedded_hal::digital::blocking::OutputPin;
     use embedded_time::duration::*;
 
@@ -12,17 +12,16 @@ pub mod ws28xx {
         pub full_cycle: u32,
     }
 
+    #[allow(unused_variables)]
     impl StripTimings {
-        pub const _WS2811_ADAFRUIT: StripTimings =
+        pub const WS2811_ADAFRUIT: StripTimings =
             StripTimings { zero_h: 500_u32, one_h: 1200_u32, full_cycle: 2500_u32 };
         pub const WS2812_ADAFRUIT: StripTimings =
             StripTimings { zero_h: 400_u32, one_h: 800_u32, full_cycle: 1250_u32 };
-
-        pub const _WS2811_TIM_800KHZ: StripTimings =
-            StripTimings { zero_h: 200_u32, one_h: 600_u32, full_cycle: 1250_u32 };
-        pub const _WS2811_TIM_400KHZ: StripTimings =
-            StripTimings { zero_h: 500_u32, one_h: 1200_u32, full_cycle: 2500_u32 };
     }
+
+    pub const WS2811_DELAY_LOOPS_BEFORE_SEND: u32 = 900;
+
     #[allow(clippy::upper_case_acronyms)]
     pub enum ColorOrder {
         RGB,
@@ -55,16 +54,47 @@ pub mod ws28xx {
     }
 
     impl PhysicalStrip {
-        pub fn send_bits<'a>(
+        pub fn send_bits<'a, P1, P2, P3>(
             &self,
-            pin: &mut impl OutputPin,
-            bits: impl IntoIterator<Item = &'a bool>,
-        ) {
-            // Put the bits in the global timer interrupt array
-
-            // Set a global flag to indicate that the bits can be sent
-
-            // Loop until the global flag is cleared by the interrupt
+            pins: &mut p::PinControl<P1, P2, P3>,
+            bit_buffer: impl IntoIterator<Item = &'a bool>,
+        ) where
+            P1: OutputPin,
+            P2: OutputPin,
+            P3: OutputPin,
+        {
+            // restart the timer every time to make sure it's configured correctly and nobody has
+            // changed its interrupt timing settings:
+            PinControl::periodic_start(
+                pins,
+                (StripTimings::WS2812_ADAFRUIT.full_cycle / 3).nanoseconds(),
+            );
+            // keep the data pin low long enough for the leds to reset
+            PinControl::set_pin_low(self.pin, pins);
+            for _ in 0..WS2811_DELAY_LOOPS_BEFORE_SEND {
+                PinControl::periodic_wait(pins);
+            }
+            // iterate over the bits and send them to the pin with appropriate timing
+            for bit in bit_buffer {
+                match bit {
+                    true => {
+                        // on for 2/3 of the total time:
+                        PinControl::set_pin_high(self.pin, pins);
+                        PinControl::periodic_wait(pins);
+                        PinControl::periodic_wait(pins);
+                        PinControl::set_pin_low(self.pin, pins);
+                        PinControl::periodic_wait(pins);
+                    }
+                    false => {
+                        // on for 1/3 of the total time:
+                        PinControl::set_pin_high(self.pin, pins);
+                        PinControl::periodic_wait(pins);
+                        PinControl::set_pin_low(self.pin, pins);
+                        PinControl::periodic_wait(pins);
+                        PinControl::periodic_wait(pins);
+                    }
+                }
+            }
         }
 
         fn colors_to_bytes<'a>(
@@ -97,7 +127,7 @@ pub mod ws28xx {
             LogicalStrip::<NUM_LEDS> { color_buffer: [c::Color::default(); NUM_LEDS], strips }
         }
 
-        //this sets the color value in the color array at index:
+        // this sets the color value in the color array at index:
         pub fn set_color_at_index(&mut self, index: usize, color: c::Color) {
             self.color_buffer[index] = color;
         }
@@ -107,12 +137,18 @@ pub mod ws28xx {
             self.color_buffer = [color; NUM_LEDS];
         }
 
+        // this takes an array of u8 color data and converts it into an array of bools
         fn bytes_as_bit_slice(byte_buffer: &[u8]) -> &BitSlice<Msb0, u8> {
             byte_buffer.view_bits::<Msb0>()
         }
 
         // this will iterate over all the strips and send the led data in series:
-        pub fn send_all_sequential(&self) {
+        pub fn send_all_sequential<P1, P2, P3>(&self, pins: &mut p::PinControl<P1, P2, P3>)
+        where
+            P1: OutputPin,
+            P2: OutputPin,
+            P3: OutputPin,
+        {
             let mut start_index = 0;
 
             for strip in self.strips {
@@ -129,8 +165,7 @@ pub mod ws28xx {
 
                 let bit_slice = Self::bytes_as_bit_slice(&byte_buffer[..byte_count]);
 
-                // call send bits and send the timing array
-                //strip.send_bits(pins, bit_slice);
+                strip.send_bits(pins, bit_slice.iter().by_ref());
 
                 start_index = end_index;
             }

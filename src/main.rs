@@ -4,18 +4,18 @@
 pub mod animations;
 pub mod colors;
 pub mod leds;
+pub mod pins;
 
 use crate::animations as a;
 use crate::colors as c;
 use crate::leds::ws28xx as strip;
+use crate::pins as p;
 
-// use bitvec::prelude::*;
-// use bitvec::ptr::Mut;
-// use bitvec::slice::BitSlice;
 use bl602_hal as hal;
 use core::fmt::Write;
+use embedded_hal::delay::blocking::DelayMs;
 use embedded_hal::digital::blocking::OutputPin;
-use embedded_time::{duration::*, rate::*};
+use embedded_time::rate::*;
 use hal::{
     clock::{Strict, SysclkFreq, UART_PLL_FREQ},
     gpio::{Output, PullDown},
@@ -37,6 +37,9 @@ type LedPinCloset = hal::gpio::Pin0<Output<PullDown>>;
 type LedPinWindow = hal::gpio::Pin1<Output<PullDown>>;
 type LedPinDoor = hal::gpio::Pin3<Output<PullDown>>;
 
+// Make sure that the timer used in the main function is of this type:
+type PeriodicTimer = ConfiguredTimerChannel0;
+
 // The number of LEDs on each strip:
 const NUM_LEDS_WINDOW_STRIP: usize = 74;
 const NUM_LEDS_DOOR_STRIP: usize = 61;
@@ -47,27 +50,27 @@ const CLOSET_STRIP: strip::PhysicalStrip = strip::PhysicalStrip {
     pin: CLOSET_STRIP_PIN,
     led_count: NUM_LEDS_CLOSET_STRIP,
     reversed: false,
-    color_order: strip::ColorOrder::BRG,
+    color_order: strip::ColorOrder::GRB,
 };
 const WINDOW_STRIP: strip::PhysicalStrip = strip::PhysicalStrip {
     pin: WINDOW_STRIP_PIN,
     led_count: NUM_LEDS_WINDOW_STRIP,
     reversed: false,
-    color_order: strip::ColorOrder::BRG,
+    color_order: strip::ColorOrder::GRB,
 };
 const DOOR_STRIP: strip::PhysicalStrip = strip::PhysicalStrip {
     pin: DOOR_STRIP_PIN,
     led_count: NUM_LEDS_DOOR_STRIP,
     reversed: true,
-    color_order: strip::ColorOrder::BRG,
+    color_order: strip::ColorOrder::GRB,
 };
 
+const NUM_STRIPS: usize = 3;
 // combined strip group:
-const ALL_STRIPS: [strip::PhysicalStrip; 3] = [CLOSET_STRIP, WINDOW_STRIP, DOOR_STRIP];
+const ALL_STRIPS: [strip::PhysicalStrip; NUM_STRIPS] = [CLOSET_STRIP, WINDOW_STRIP, DOOR_STRIP];
 
 // The number of LEDs on each strip:
 const MAX_SINGLE_STRIP_BYTE_BUFFER_LENGTH: usize = get_single_strip_buffer_max_length(&ALL_STRIPS);
-const _MAX_SINGLE_STRIP_BIT_BUFFER_LENGTH: usize = MAX_SINGLE_STRIP_BYTE_BUFFER_LENGTH * 8;
 
 // calculate the total number of LEDs from the above values:
 const NUM_LEDS: usize = get_total_num_leds(&ALL_STRIPS);
@@ -99,7 +102,6 @@ const fn get_total_num_leds(strips: &[strip::PhysicalStrip]) -> usize {
 fn main() -> ! {
     // make the logical strip:
     let _initial_animation = a::Animation::new(NUM_LEDS);
-    let mut _office_strip = strip::LogicalStrip::<NUM_LEDS>::new(&ALL_STRIPS);
 
     let dp = pac::Peripherals::take().unwrap();
     let mut gpio_pins = dp.GLB.split();
@@ -138,54 +140,39 @@ fn main() -> ! {
 
     // Get the timer and initialize it to count up every clock cycle:
     let timers = dp.TIMER.split();
-    let mut timer_ch0 = timers
+    let timer_ch0 = timers
         .channel0
         .set_clock_source(ClockSource::Fclk(&clocks), 160_000_000_u32.Hz());
 
-    // let mut color = c::C_RED;
-    // office_strip.set_strip_to_solid_color(color);
-    //office_strip.send_all_sequential(&mut pins);
-    // color = c::C_GREEN;
-    // office_strip.set_strip_to_solid_color(color);
-    //office_strip.send_all_sequential(&mut pins);
-    // color = c::C_BLUE;
-    // office_strip.set_strip_to_solid_color(color);
-    //office_strip.send_all_sequential(&mut pins);
+    let mut pins = p::PinControl {
+        p1: closet_led_pin,
+        p2: window_led_pin,
+        p3: door_led_pin,
+        timer: timer_ch0,
+    };
+
+    let mut office_strip = strip::LogicalStrip::<NUM_LEDS>::new(&ALL_STRIPS);
+
+    // get a millisecond delay for use with test patterns:
+    let mut d = bl602_hal::delay::McycleDelay::new(clocks.sysclk().0);
+
+    // test color pattern before entering main program loop:
+    let mut color = c::C_RED;
+    office_strip.set_strip_to_solid_color(color);
+    office_strip.send_all_sequential(&mut pins);
+    d.delay_ms(1000).ok();
+    color = c::C_GREEN;
+    office_strip.set_strip_to_solid_color(color);
+    office_strip.send_all_sequential(&mut pins);
+    d.delay_ms(1000).ok();
+    color = c::C_BLUE;
+    office_strip.set_strip_to_solid_color(color);
+    office_strip.send_all_sequential(&mut pins);
+    d.delay_ms(1000).ok();
 
     loop {
-        periodic_start(
-            &mut timer_ch0,
-            (strip::StripTimings::WS2812_ADAFRUIT.full_cycle / 3).nanoseconds(),
-        );
-        closet_led_pin.set_low().ok();
-        for _ in 0..900 {
-            faster_wait(&mut timer_ch0);
-        }
-        for _ in 0..96 {
-            // office_strip.set_strip_to_solid_color(c::Color::new(9, 3, 5));
-            // office_strip.send_all_sequential(&mut pins);
-            closet_led_pin.set_high().ok();
-            faster_wait(&mut timer_ch0);
-            faster_wait(&mut timer_ch0);
-            closet_led_pin.set_low().ok();
-            faster_wait(&mut timer_ch0);
-        }
-    }
-}
-fn periodic_start(timer: &mut ConfiguredTimerChannel0, time: impl Into<Nanoseconds<u64>>) {
-    let time: Nanoseconds<u64> = time.into();
-    timer.set_match2(time);
-    timer.enable_match2_interrupt();
-    timer.set_preload_value(0.nanoseconds());
-    timer.set_preload(Preload::PreloadMatchComparator2);
-    timer.enable();
-}
-
-fn faster_wait(timer: &mut ConfiguredTimerChannel0) {
-    loop {
-        if timer.is_match2() {
-            timer.clear_match2_interrupt();
-            break;
-        }
+        office_strip.set_strip_to_solid_color(c::C_OFF);
+        office_strip.send_all_sequential(&mut pins);
+        d.delay_ms(1000).ok();
     }
 }

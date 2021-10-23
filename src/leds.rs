@@ -129,12 +129,14 @@ pub mod ws28xx {
 
         // this sets the color value in the color array at index:
         pub fn set_color_at_index(&mut self, index: usize, color: c::Color) {
-            self.color_buffer[index] = color;
+            self.color_buffer[index].set_color(color);
         }
 
         // this fills the entire strip with a single color:
         pub fn set_strip_to_solid_color(&mut self, color: c::Color) {
-            self.color_buffer = [color; NUM_LEDS];
+            for c in &mut self.color_buffer {
+                c.set_color(color);
+            }
         }
 
         // this takes an array of u8 color data and converts it into an array of bools

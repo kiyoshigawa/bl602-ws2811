@@ -22,6 +22,11 @@ impl Color {
         self.b = GAMMA8[b as usize];
     }
 
+    // change RGB color values for mutable color
+    pub fn set_color(&mut self, color: Color) {
+        self.set_rgb(color.r, color.g, color.b);
+    }
+
     // t=This maps a color to a fractional mid-color based on the position of the factor
     // between the in_min and in_max values. It will automatically truncate any values
     // below 0 or larger than 255 when it is cast back to a u8 at the end of the calculation.
@@ -68,8 +73,9 @@ pub const C_T_5000K: Color = Color { r: 255, g: 228, b: 206 };
 
 // Use const generic rainbows to make iterable rainbows of various sizes. Rainbows contain a
 // list of colors in order, which will be used by animations as a color palette.
+#[derive(Copy, Clone)]
 pub struct Rainbow<const N: usize> {
-    colors: [Color; N],
+    pub colors: [Color; N],
 }
 
 pub const R_OFF: Rainbow<1> = Rainbow { colors: [C_OFF] };

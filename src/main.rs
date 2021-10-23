@@ -11,6 +11,7 @@ use crate::colors as c;
 use crate::leds::ws28xx as strip;
 use crate::pins as p;
 
+use crate::colors::{C_BLUE, C_GREEN, C_RED};
 use bl602_hal as hal;
 use core::fmt::Write;
 use embedded_hal::delay::blocking::DelayMs;
@@ -132,11 +133,11 @@ fn main() -> ! {
 
     // Make sure the pin numbers here match the const pin numbers on the strips:
     let mut closet_led_pin: LedPinCloset = gpio_pins.pin0.into_pull_down_output();
-    let _ = closet_led_pin.set_low();
+    closet_led_pin.set_low().ok();
     let mut window_led_pin: LedPinWindow = gpio_pins.pin1.into_pull_down_output();
-    let _ = window_led_pin.set_low();
+    window_led_pin.set_low().ok();
     let mut door_led_pin: LedPinDoor = gpio_pins.pin3.into_pull_down_output();
-    let _ = door_led_pin.set_low();
+    door_led_pin.set_low().ok();
 
     // Get the timer and initialize it to count up every clock cycle:
     let timers = dp.TIMER.split();
@@ -169,10 +170,28 @@ fn main() -> ! {
     office_strip.set_strip_to_solid_color(color);
     office_strip.send_all_sequential(&mut pins);
     d.delay_ms(1000).ok();
+    office_strip.set_strip_to_solid_color(c::C_OFF);
+    office_strip.send_all_sequential(&mut pins);
+    d.delay_ms(1000).ok();
 
     loop {
-        office_strip.set_strip_to_solid_color(c::C_OFF);
-        office_strip.send_all_sequential(&mut pins);
-        d.delay_ms(1000).ok();
+        for i in 0..100 {
+            color = c::Color::color_lerp(i, 0, 100, C_RED, C_GREEN);
+            office_strip.set_strip_to_solid_color(color);
+            office_strip.send_all_sequential(&mut pins);
+            d.delay_ms(100).ok();
+        }
+        for i in 0..100 {
+            color = c::Color::color_lerp(i, 0, 100, C_GREEN, C_BLUE);
+            office_strip.set_strip_to_solid_color(color);
+            office_strip.send_all_sequential(&mut pins);
+            d.delay_ms(100).ok();
+        }
+        for i in 0..100 {
+            color = c::Color::color_lerp(i, 0, 100, C_BLUE, C_RED);
+            office_strip.set_strip_to_solid_color(color);
+            office_strip.send_all_sequential(&mut pins);
+            d.delay_ms(100).ok();
+        }
     }
 }

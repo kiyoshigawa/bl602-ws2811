@@ -3,15 +3,15 @@
 
 pub mod animations;
 pub mod colors;
+pub mod hardware;
 pub mod leds;
-pub mod pins;
 
 use crate::animations as a;
 use crate::colors as c;
 use crate::leds::ws28xx as strip;
 
 use crate::colors::{C_BLUE, C_GREEN, C_RED};
-use crate::pins::{DynamicPin, HardwareController, NoPin};
+use crate::hardware::{DynamicPin, HardwareController};
 use bl602_hal as hal;
 use core::fmt::Write;
 use embedded_hal::delay::blocking::DelayMs;
@@ -24,14 +24,6 @@ use hal::{
     timer::*,
 };
 use panic_halt as _;
-
-//total number of pins on the BL602
-pub const BL602_NUM_PINS: usize = 23;
-
-// Hardware specific config for tim's office.
-pub const CLOSET_STRIP_PIN: usize = 0;
-pub const WINDOW_STRIP_PIN: usize = 3;
-pub const DOOR_STRIP_PIN: usize = 1;
 
 // Real Values:
 // The number of LEDs on each strip:
@@ -47,21 +39,18 @@ const NUM_LEDS_CLOSET_STRIP: usize = 4;
 
 // individual strips:
 const CLOSET_STRIP: strip::PhysicalStrip = strip::PhysicalStrip {
-    pin: CLOSET_STRIP_PIN,
     led_count: NUM_LEDS_CLOSET_STRIP,
     reversed: false,
     color_order: strip::ColorOrder::BRG,
     strip_timings: strip::StripTimings::WS2812_ADAFRUIT,
 };
 const WINDOW_STRIP: strip::PhysicalStrip = strip::PhysicalStrip {
-    pin: WINDOW_STRIP_PIN,
     led_count: NUM_LEDS_WINDOW_STRIP,
     reversed: false,
     color_order: strip::ColorOrder::BRG,
     strip_timings: strip::StripTimings::WS2812_ADAFRUIT,
 };
 const DOOR_STRIP: strip::PhysicalStrip = strip::PhysicalStrip {
-    pin: DOOR_STRIP_PIN,
     led_count: NUM_LEDS_DOOR_STRIP,
     reversed: true,
     color_order: strip::ColorOrder::BRG,
@@ -69,7 +58,7 @@ const DOOR_STRIP: strip::PhysicalStrip = strip::PhysicalStrip {
 };
 
 const NUM_STRIPS: usize = 3;
-// combined strip group:
+// combined strip group, make sure your pins in main() are in the same order as the strip order here:
 const ALL_STRIPS: [strip::PhysicalStrip; NUM_STRIPS] = [CLOSET_STRIP, WINDOW_STRIP, DOOR_STRIP];
 
 // The number of LEDs on each strip:
@@ -121,11 +110,11 @@ fn main() -> ! {
         .channel0
         .set_clock_source(ClockSource::Fclk(&clocks), 160_000_000_u32.Hz());
 
-    let pins: [DynamicPin; 4] = [
+    // The order of pins here needs to match the array of strips passed into LogicalStrip::new()
+    let pins: [DynamicPin; NUM_STRIPS] = [
         &mut gpio_pins.pin0.into_pull_down_output(),
-        &mut gpio_pins.pin1.into_pull_down_output(),
-        &mut NoPin,
         &mut gpio_pins.pin3.into_pull_down_output(),
+        &mut gpio_pins.pin1.into_pull_down_output(),
     ];
 
     let mut office_strip = strip::LogicalStrip::<NUM_LEDS>::new(&ALL_STRIPS);

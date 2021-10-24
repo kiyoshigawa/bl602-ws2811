@@ -1,6 +1,6 @@
 pub mod ws28xx {
     use crate::colors as c;
-    use crate::pins::HardwareController;
+    use crate::hardware::HardwareController;
     use bitvec::prelude::*;
     use embedded_time::duration::*;
 
@@ -45,7 +45,6 @@ pub mod ws28xx {
     }
 
     pub struct PhysicalStrip {
-        pub pin: usize,
         pub led_count: usize,
         pub reversed: bool,
         pub color_order: ColorOrder,
@@ -56,13 +55,14 @@ pub mod ws28xx {
         pub fn send_bits<'b>(
             &self,
             hc: &mut HardwareController,
+            pin_index: usize,
             bit_buffer: impl IntoIterator<Item = &'b bool>,
         ) {
             // restart the timer every time to make sure it's configured correctly and nobody has
             // changed its interrupt timing settings:
             hc.periodic_start((self.strip_timings.full_cycle / 3).nanoseconds());
             // keep the data pin low long enough for the leds to reset
-            hc.set_low(self.pin);
+            hc.set_low(pin_index);
             for _ in 0..WS2811_DELAY_LOOPS_BEFORE_SEND {
                 hc.periodic_wait();
             }
@@ -71,17 +71,17 @@ pub mod ws28xx {
                 match bit {
                     true => {
                         // on for 2/3 of the total time:
-                        hc.set_high(self.pin);
+                        hc.set_high(pin_index);
                         hc.periodic_wait();
                         hc.periodic_wait();
-                        hc.set_low(self.pin);
+                        hc.set_low(pin_index);
                         hc.periodic_wait();
                     }
                     false => {
                         // on for 1/3 of the total time:
-                        hc.set_high(self.pin);
+                        hc.set_high(pin_index);
                         hc.periodic_wait();
-                        hc.set_low(self.pin);
+                        hc.set_low(pin_index);
                         hc.periodic_wait();
                         hc.periodic_wait();
                     }
@@ -116,7 +116,7 @@ pub mod ws28xx {
         pub fn send_all_sequential(&self, hc: &mut HardwareController) {
             let mut start_index = 0;
 
-            for strip in self.strips {
+            for (pin_index, strip) in self.strips.iter().enumerate() {
                 let end_index = start_index + strip.led_count;
 
                 let current_strip_colors = &self.color_buffer[start_index..end_index];
@@ -132,7 +132,7 @@ pub mod ws28xx {
 
                 let bit_slice = Self::bytes_as_bit_slice(&byte_buffer[..byte_count]);
 
-                strip.send_bits(hc, bit_slice.iter().by_ref());
+                strip.send_bits(hc, pin_index, bit_slice.iter().by_ref());
 
                 start_index = end_index;
             }

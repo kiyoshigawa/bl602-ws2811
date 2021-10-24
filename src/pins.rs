@@ -1,61 +1,158 @@
-use crate::{PeriodicTimer, CLOSET_STRIP_PIN, DOOR_STRIP_PIN, WINDOW_STRIP_PIN};
-use bl602_hal::timer::Preload;
+use crate::leds::ws28xx::PhysicalStrip;
+use crate::BL602_NUM_PINS;
+use bl602_hal::gpio::Parts;
+use bl602_hal::timer::{ConfiguredTimerChannel0, Preload};
+use core::convert::Infallible;
 use embedded_hal::digital::blocking::OutputPin;
 use embedded_time::duration::*;
 
-// Struct to hold the actual pins.
-// All pins must have the OutputPin trait. The OutputPin trait allows
-// them to be used with set_low() and set_high() even though they are
-// technically different types.
-pub struct PinControl<P1: OutputPin, P2: OutputPin, P3: OutputPin> {
-    pub p1: P1,
-    pub p2: P2,
-    pub p3: P3,
-    pub timer: PeriodicTimer,
+pub type DynamicPin<'a> = &'a mut dyn OutputPin<Error = Infallible>;
+type Timer = ConfiguredTimerChannel0;
+pub struct HardwareController<'a> {
+    pins: [DynamicPin<'a>; 4],
+    timer: Timer,
 }
 
-impl<P1, P2, P3> PinControl<P1, P2, P3>
-where
-    P1: OutputPin,
-    P2: OutputPin,
-    P3: OutputPin,
-{
-    //noinspection RsSelfConvention
-    // This allows us to use the pin number in a match statement to call the set_low() function.
-    pub fn set_pin_low(pin: u8, pins: &mut PinControl<P1, P2, P3>) {
-        match pin {
-            CLOSET_STRIP_PIN => pins.p1.set_low().ok(),
-            WINDOW_STRIP_PIN => pins.p2.set_low().ok(),
-            DOOR_STRIP_PIN => pins.p3.set_low().ok(),
-            _ => unreachable!(),
-        };
-    }
-    //noinspection RsSelfConvention
-    // This allows us to use the pin number in a match statement to call the set_high() function.
-    pub fn set_pin_high(pin: u8, pins: &mut PinControl<P1, P2, P3>) {
-        match pin {
-            CLOSET_STRIP_PIN => pins.p1.set_high().ok(),
-            WINDOW_STRIP_PIN => pins.p2.set_high().ok(),
-            DOOR_STRIP_PIN => pins.p3.set_high().ok(),
-            _ => unreachable!(),
-        };
+#[derive(Copy, Clone)]
+pub struct NoPin;
+impl OutputPin for NoPin {
+    type Error = Infallible;
+
+    fn set_low(&mut self) -> Result<(), Self::Error> {
+        Ok(())
     }
 
-    pub fn periodic_start(pins: &mut PinControl<P1, P2, P3>, time: impl Into<Nanoseconds<u64>>) {
+    fn set_high(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
+impl<'a> HardwareController<'a> {
+    pub fn new(pins: [DynamicPin<'a>; 4], timer: Timer) -> Self {
+        let mut hc = HardwareController { pins, timer };
+        // hc.setup_strip_pins(gpio_pins, strips);
+        hc
+    }
+
+    pub fn set_low(&mut self, pin: usize) {
+        self.pins[pin].set_low();
+    }
+
+    pub fn set_high(&mut self, pin: usize) {
+        self.pins[pin].set_high();
+    }
+
+    pub fn periodic_start(&mut self, time: impl Into<Nanoseconds<u64>>) {
+        self.timer.periodic_start(time);
+    }
+
+    pub fn periodic_wait(&mut self) {
+        self.timer.periodic_wait();
+    }
+
+    // /// This sets up output pins used by the logical strip and gives the logical strip access
+    // /// to them for sending data. It's long and ugly, and only works for the BL602, but it works,
+    // /// and it means you don't need to worry about tracking down any pin changes throughout the
+    // /// codebase.
+    // fn setup_strip_pins(&mut self, pins: &mut Parts, strips: &[PhysicalStrip]) {
+    //     for strip in strips {
+    //         match strip.pin {
+    //             0 => {
+    //                 self.pins[strip.pin] = &mut pins.pin0.into_pull_down_output();
+    //             }
+    //             1 => {
+    //                 self.pins[strip.pin] = &mut pins.pin1.into_pull_down_output();
+    //             }
+    //             // 2 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin2.into_pull_down_output());
+    //             // }
+    //             // 3 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin3.into_pull_down_output());
+    //             // }
+    //             // 4 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin4.into_pull_down_output());
+    //             // }
+    //             // 5 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin5.into_pull_down_output());
+    //             // }
+    //             // 6 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin6.into_pull_down_output());
+    //             // }
+    //             // 7 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin7.into_pull_down_output());
+    //             // }
+    //             // 8 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin8.into_pull_down_output());
+    //             // }
+    //             // 9 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin9.into_pull_down_output());
+    //             // }
+    //             // 10 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin10.into_pull_down_output());
+    //             // }
+    //             // 11 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin11.into_pull_down_output());
+    //             // }
+    //             // 12 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin12.into_pull_down_output());
+    //             // }
+    //             // 13 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin13.into_pull_down_output());
+    //             // }
+    //             // 14 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin14.into_pull_down_output());
+    //             // }
+    //             // 15 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin15.into_pull_down_output());
+    //             // }
+    //             // 16 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin16.into_pull_down_output());
+    //             // }
+    //             // 17 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin17.into_pull_down_output());
+    //             // }
+    //             // 18 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin18.into_pull_down_output());
+    //             // }
+    //             // 19 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin19.into_pull_down_output());
+    //             // }
+    //             // 20 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin20.into_pull_down_output());
+    //             // }
+    //             // 21 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin21.into_pull_down_output());
+    //             // }
+    //             // 22 => {
+    //             //     self.pins[strip.pin] = Some(&mut pins.pin22.into_pull_down_output());
+    //             // }
+    //             _ => {
+    //                 self.pins[strip.pin] = &mut NoPin;
+    //             }
+    //         };
+    //     }
+    // }
+}
+
+pub trait PeriodicTimer {
+    fn periodic_start(&mut self, time: impl Into<Nanoseconds<u64>>);
+    fn periodic_wait(&mut self);
+}
+
+impl PeriodicTimer for ConfiguredTimerChannel0 {
+    fn periodic_start(&mut self, time: impl Into<Nanoseconds<u64>>) {
         let time: Nanoseconds<u64> = time.into();
-        let timer = &mut pins.timer;
-        timer.set_match2(time);
-        timer.enable_match2_interrupt();
-        timer.set_preload_value(0.nanoseconds());
-        timer.set_preload(Preload::PreloadMatchComparator2);
-        timer.enable();
+        self.set_match2(time);
+        self.enable_match2_interrupt();
+        self.set_preload_value(0.nanoseconds());
+        self.set_preload(Preload::PreloadMatchComparator2);
+        self.enable();
     }
 
-    pub fn periodic_wait(pins: &mut PinControl<P1, P2, P3>) {
-        let timer = &mut pins.timer;
+    fn periodic_wait(&mut self) {
         loop {
-            if timer.is_match2() {
-                timer.clear_match2_interrupt();
+            if self.is_match2() {
+                self.clear_match2_interrupt();
                 break;
             }
         }

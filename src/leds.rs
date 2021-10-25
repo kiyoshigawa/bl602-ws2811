@@ -1,6 +1,6 @@
 pub mod ws28xx {
     use crate::colors as c;
-    use crate::hardware::HardwareController;
+    use crate::hardware::{HardwareController, PeriodicTimer};
     use bitvec::prelude::*;
     use embedded_time::duration::*;
 
@@ -52,12 +52,14 @@ pub mod ws28xx {
     }
 
     impl PhysicalStrip {
-        pub fn send_bits<'b>(
+        pub fn send_bits<'b, T>(
             &self,
-            hc: &mut HardwareController,
+            hc: &mut HardwareController<T>,
             pin_index: usize,
             bit_buffer: impl IntoIterator<Item = &'b bool>,
-        ) {
+        ) where
+            T: PeriodicTimer,
+        {
             // restart the timer every time to make sure it's configured correctly and nobody has
             // changed its interrupt timing settings:
             hc.periodic_start((self.strip_timings.full_cycle / 3).nanoseconds());
@@ -113,7 +115,10 @@ pub mod ws28xx {
         }
 
         // this will iterate over all the strips and send the led data in series:
-        pub fn send_all_sequential(&self, hc: &mut HardwareController) {
+        pub fn send_all_sequential<T>(&self, hc: &mut HardwareController<T>)
+        where
+            T: PeriodicTimer,
+        {
             let mut start_index = 0;
 
             for (pin_index, strip) in self.strips.iter().enumerate() {

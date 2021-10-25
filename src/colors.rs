@@ -181,6 +181,7 @@ pub const R_VU_METER: Rainbow<10> = Rainbow {
 
 pub const NUM_RAINBOWS: usize = 31;
 
+/// This is an array of the rainbow consts above that can be used to cycle through palettes in animations.
 pub const RAINBOW_ARRAY: [&[Color]; NUM_RAINBOWS] = [
     &R_OFF.colors,
     &R_ON.colors,
@@ -215,8 +216,8 @@ pub const RAINBOW_ARRAY: [&[Color]; NUM_RAINBOWS] = [
     &R_WHITE_PATTERN.colors,
 ];
 
-// A color correction table for LEDs to make them look like the color you expect:
-// Shamelessly stolen from Adafruit's neopixel library somewhere a long time ago.
+/// A color correction table for LEDs to make them look like the color you expect:
+/// Shamelessly stolen from Adafruit's neopixel library somewhere a long time ago.
 pub const GAMMA8: [u8; 256] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5,
@@ -230,3 +231,6 @@ pub const GAMMA8: [u8; 256] = [
     177, 180, 182, 184, 186, 189, 191, 193, 196, 198, 200, 203, 205, 208, 210, 213, 215, 218, 220,
     223, 225, 228, 231, 233, 236, 239, 241, 244, 247, 249, 252, 255,
 ];
+
+/// This is the first color in the GAMMA8 array that is not completely turned off.
+pub const FIRST_NON_OFF_COLOR: usize = 28;

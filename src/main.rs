@@ -1,14 +1,14 @@
 #![no_std]
 #![no_main]
 
-pub mod animations;
 pub mod colors;
 pub mod hardware;
 pub mod leds;
+pub mod lighting_controller;
 
-use crate::animations as a;
 use crate::colors as c;
 use crate::leds::ws28xx as strip;
+use crate::lighting_controller as lc;
 
 use crate::colors::{C_BLUE, C_GREEN, C_RED};
 use crate::hardware::{DynamicPin, HardwareController};
@@ -28,7 +28,7 @@ use panic_halt as _;
 // Real Values:
 // The number of LEDs on each strip:
 // const NUM_LEDS_WINDOW_STRIP: usize = 74;
-// const NUM_LEDS_DOOR_STRIP: usize = 61;
+// const NUM_LEDS_DOOR_STRIP: usize = 59;
 // const NUM_LEDS_CLOSET_STRIP: usize = 34;
 
 // Test Strip Values:
@@ -92,9 +92,6 @@ const fn get_total_num_leds(strips: &[strip::PhysicalStrip]) -> usize {
 
 #[riscv_rt::entry]
 fn main() -> ! {
-    // make the logical strip:
-    let _initial_animation = a::Animation::new(NUM_LEDS);
-
     let dp = pac::Peripherals::take().unwrap();
     let mut gpio_pins = dp.GLB.split();
 

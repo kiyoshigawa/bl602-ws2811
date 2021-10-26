@@ -18,10 +18,7 @@ impl<'a, T> HardwareController<'a, T>
 where
     T: PeriodicTimer,
 {
-    pub fn new(pins: [DynamicPin<'a>; NUM_STRIPS], timer: T) -> Self
-    where
-        T: PeriodicTimer,
-    {
+    pub fn new(pins: [DynamicPin<'a>; NUM_STRIPS], timer: T) -> Self {
         HardwareController { pins, timer }
     }
 

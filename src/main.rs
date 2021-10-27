@@ -1,11 +1,13 @@
 #![no_std]
 #![no_main]
 
+pub mod animations;
 pub mod colors;
 pub mod hardware;
 pub mod leds;
 pub mod lighting_controller;
 
+use crate::animations as a;
 use crate::colors as c;
 use crate::leds::ws28xx as strip;
 use crate::lighting_controller as lc;
@@ -117,6 +119,22 @@ fn main() -> ! {
     let mut office_strip = strip::LogicalStrip::<NUM_LEDS>::new(&ALL_STRIPS);
 
     let mut hc = HardwareController::new(pins, timer_ch0);
+
+    // For now, the translation array is just all the leds on the office_strip
+    let mut translation_array: [usize; NUM_LEDS] = [0; NUM_LEDS];
+    for (index, value) in translation_array.iter_mut().enumerate() {
+        *value = index;
+    }
+
+    // Make a single animation operating on the whole strip:
+    let mut a = a::Animation::new(a::ANI_TEST, translation_array);
+    let animation_array = [&mut a];
+
+    let lc = lc::LightingController::new(
+        office_strip.color_buffer.as_mut(),
+        animation_array,
+        60_u32.Hz(),
+    );
 
     // Set up uart output for debug printing. Since this microcontroller has a pin matrix,
     // we need to set up both the pins and the muxs

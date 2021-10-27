@@ -12,22 +12,22 @@ pub enum BackgroundMode {
     NoBackground,
 
     /// This shows a solid unchanging color on all the leds in the background. The color will be the
-    /// first in the rainbow. You can step to other colors in the rainbow by external trigger,
+    /// first in the palette. You can step to other colors in the palette by external trigger,
     /// otherwise it does not change.
     Solid,
 
-    /// This will slowly fade all the leds as a single color fading through the colors of a rainbow.
-    /// Color offset can be externally triggered to the next color in the rainbow, or will move
+    /// This will slowly fade all the leds as a single color fading through the colors of a palette.
+    /// Color offset can be externally triggered to the next color in the palette, or will move
     /// at a constant rate.
     SolidFade,
 
-    /// This will populate a rainbow's colors evenly across the LED in the animation in order. It
+    /// This will populate a palette's colors evenly across the LED in the animation in order. It
     /// does not animate once drawn.
-    Rainbow,
+    FillPalette,
 
-    /// This will populate a rainbow like above, but it will animate it by slowly offsetting the
+    /// This will populate a palette like above, but it will animate it by slowly offsetting the
     /// color pattern over time.
-    RainbowRotate,
+    FillPaletteRotate,
 }
 
 /// Foreground modes are rendered second, and will animate over the background animation layer but
@@ -37,25 +37,25 @@ pub enum ForegroundMode {
     /// This is a mode that has no additional foreground animation over the background animation.
     NoForeground,
 
-    /// This will display a single-color marquee style pixel chase animation using rainbow
-    /// colors. The foreground trigger will advance to the next color of the rainbow.
+    /// This will display a single-color marquee style pixel chase animation using palette
+    /// colors. The foreground trigger will advance to the next color of the palette.
     MarqueeSolid,
 
     /// This will display a fixed pattern the same as a marquee chase animation that will only
     /// move if the offset is changed manually where the color is always a solid constant color.
-    /// The foreground trigger will advance to the next color of the rainbow.
+    /// The foreground trigger will advance to the next color of the palette.
     MarqueeSolidFixed,
 
     /// This will display a marquee style animation where the color of all the LEDs slowly fades
-    /// through the colors of a rainbow. It will advance to the next color if externally triggered.
+    /// through the colors of a palette. It will advance to the next color if externally triggered.
     MarqueeFade,
 
     /// This will display a fixed pattern the same as a marquee chase animation that will only move
     /// if the offset is changed manually where the color of all the LEDs slowly fades through the
-    /// colors of a rainbow. It will advance to the next color if externally triggered.
+    /// colors of a palette. It will advance to the next color if externally triggered.
     MarqueeFadeFixed,
 
-    /// This will render the foreground rainbow based on the offset value, and leave LEDs below
+    /// This will render the foreground palette based on the offset value, and leave LEDs below
     /// the offset value alone.
     VUMeter,
 }
@@ -88,9 +88,9 @@ pub enum TriggerMode {
 
     /// This will cause a pulse of to appear somewhere randomly along the led array.
     /// It will fade in, then fade back out one time per trigger.
-    /// Each pulse will be a new color in the order of the rainbow.
+    /// Each pulse will be a new color in the order of the palette.
     /// fade in and out times can be adjusted separately.
-    ColorPulseRainbow,
+    ColorPulsePalette,
 
     /// This will cause colored pulses of a single color to run down the LED strip.
     /// The starting offset and direction can be specified manually.
@@ -104,8 +104,8 @@ pub enum TriggerMode {
     ColorShotSlowFade,
 
     /// This will fire off color pulses with a new color for each pulse, in the order of the colors
-    /// of a rainbow.
-    ColorShotRainbow,
+    /// of a palette.
+    ColorShotPalette,
 
     /// This will flash all the LEDs to a single color for a short time.
     /// Fade in and out times can be adjusted separately.
@@ -119,8 +119,8 @@ pub enum TriggerMode {
     FlashSlowFade,
 
     /// This will flash all the LEDs to a single slow-fading color for a short time.
-    /// Each flash will be a new color in the order of the rainbow.
-    FlashRainbow,
+    /// Each flash will be a new color in the order of the palette.
+    FlashPalette,
 }
 
 /// Denotes the direction of animations, effects vary depending on animation modes:
@@ -132,7 +132,7 @@ pub enum Direction {
 
 /// This holds the parameters that define everything needed to set up an animation. It's a struct
 /// holding the parameters for the foreground animation, the background animation, and the global
-/// information for trigger animations (such as the trigger Rainbow)
+/// information for trigger animations (such as the trigger Palette)
 pub struct AnimationParameters<const N_BG: usize, const N_FG: usize, const N_TG: usize> {
     bg: AnimationBackgroundParameters<N_BG>,
     fg: AnimationForegroundParameters<N_FG>,
@@ -143,9 +143,9 @@ pub struct AnimationParameters<const N_BG: usize, const N_FG: usize, const N_TG:
 /// aspects of the animation can be derived from these parameters.
 pub struct AnimationBackgroundParameters<const N: usize> {
     mode: BackgroundMode,
-    rainbow: c::Rainbow<N>,
+    palette: c::Palette<N>,
     direction: Direction,
-    is_rainbow_reversed: bool,
+    is_palette_reversed: bool,
     duration_ns: u64,
     subdivisions: usize,
 }
@@ -154,18 +154,18 @@ pub struct AnimationBackgroundParameters<const N: usize> {
 /// aspects of the animation can be derived from these parameters.
 pub struct AnimationForegroundParameters<const N: usize> {
     mode: ForegroundMode,
-    rainbow: c::Rainbow<N>,
+    palette: c::Palette<N>,
     direction: Direction,
-    is_rainbow_reversed: bool,
+    is_palette_reversed: bool,
     duration_ns: u64,
     step_time_ns: u64,
     subdivisions: usize,
 }
 
-/// All triggers share a single rainbow / slow fade speed, which is configured in this struct
+/// All triggers share a single palette / slow fade speed, which is configured in this struct
 pub struct AnimationGlobalTriggerParameters<const N: usize> {
-    rainbow: c::Rainbow<N>,
-    is_rainbow_reversed: bool,
+    palette: c::Palette<N>,
+    is_palette_reversed: bool,
     duration_ns: u64,
 }
 
@@ -215,7 +215,7 @@ struct AnimationState {
     offset: u16,
     current_frame: u32,
     total_frames: u32,
-    current_rainbow_color_index: usize,
+    current_palette_color_index: usize,
 }
 
 /// This struct contains all the fixed parameters of an animation, as well as the state of the
@@ -255,9 +255,9 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
 /// This background parameter struct can be used to turn off all background effects
 pub const BG_OFF: AnimationBackgroundParameters<1> = AnimationBackgroundParameters {
     mode: BackgroundMode::NoBackground,
-    rainbow: c::R_OFF,
+    palette: c::R_OFF,
     direction: Direction::Stopped,
-    is_rainbow_reversed: false,
+    is_palette_reversed: false,
     duration_ns: 0,
     subdivisions: 0,
 };
@@ -265,9 +265,9 @@ pub const BG_OFF: AnimationBackgroundParameters<1> = AnimationBackgroundParamete
 /// This foreground parameter struct can be used to turn off all foreground effects
 pub const FG_OFF: AnimationForegroundParameters<1> = AnimationForegroundParameters {
     mode: ForegroundMode::NoForeground,
-    rainbow: R_OFF,
+    palette: R_OFF,
     direction: Direction::Stopped,
-    is_rainbow_reversed: false,
+    is_palette_reversed: false,
     duration_ns: 0,
     step_time_ns: 0,
     subdivisions: 0,
@@ -275,7 +275,7 @@ pub const FG_OFF: AnimationForegroundParameters<1> = AnimationForegroundParamete
 
 /// This global trigger parameter struct can be used to turn off all trigger effects.
 pub const TRIGGER_OFF: AnimationGlobalTriggerParameters<1> =
-    AnimationGlobalTriggerParameters { rainbow: R_OFF, is_rainbow_reversed: false, duration_ns: 0 };
+    AnimationGlobalTriggerParameters { palette: R_OFF, is_palette_reversed: false, duration_ns: 0 };
 
 /// This animation parameter struct will turn off ALL animations: fg, bg, and trigger.
 pub const ANI_ALL_OFF: AnimationParameters<1, 1, 1> =
@@ -284,9 +284,9 @@ pub const ANI_ALL_OFF: AnimationParameters<1, 1, 1> =
 /// This is an animation background struct used for testing
 pub const BG_TEST: AnimationBackgroundParameters<3> = AnimationBackgroundParameters {
     mode: BackgroundMode::Solid,
-    rainbow: c::R_ROYGBIV,
+    palette: c::R_ROYGBIV,
     direction: Direction::Positive,
-    is_rainbow_reversed: false,
+    is_palette_reversed: false,
     duration_ns: 0,
     subdivisions: 0,
 };
@@ -294,9 +294,9 @@ pub const BG_TEST: AnimationBackgroundParameters<3> = AnimationBackgroundParamet
 /// This is an animation foreground struct used for testing
 pub const FG_TEST: AnimationForegroundParameters<1> = AnimationForegroundParameters {
     mode: ForegroundMode::NoForeground,
-    rainbow: R_OFF,
+    palette: R_OFF,
     direction: Direction::Stopped,
-    is_rainbow_reversed: false,
+    is_palette_reversed: false,
     duration_ns: 0,
     step_time_ns: 0,
     subdivisions: 0,
@@ -304,7 +304,7 @@ pub const FG_TEST: AnimationForegroundParameters<1> = AnimationForegroundParamet
 
 /// This is an animation trigger struct used for testing
 pub const TRIGGER_TEST: AnimationGlobalTriggerParameters<1> =
-    AnimationGlobalTriggerParameters { rainbow: R_OFF, is_rainbow_reversed: false, duration_ns: 0 };
+    AnimationGlobalTriggerParameters { palette: R_OFF, is_palette_reversed: false, duration_ns: 0 };
 
 /// This animation parameter struct will turn off ALL animations: fg, bg, and trigger.
 pub const ANI_TEST: AnimationParameters<3, 1, 1> =

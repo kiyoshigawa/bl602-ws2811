@@ -309,11 +309,37 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
     }
 
     fn update_fg(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
-        todo!();
+        match self.parameters.fg.mode {
+            ForegroundMode::NoForeground => self.update_fg_no_foreground(logical_strip),
+            ForegroundMode::MarqueeSolid => self.update_fg_marquee_solid(logical_strip),
+            ForegroundMode::MarqueeSolidFixed => self.update_fg_marquee_solid_fixed(logical_strip),
+            ForegroundMode::MarqueeFade => self.update_fg_marquee_fade(logical_strip),
+            ForegroundMode::MarqueeFadeFixed => self.update_fg_marquee_fade_fixed(logical_strip),
+            ForegroundMode::VUMeter => self.update_fg_vu_meter(logical_strip),
+        }
     }
 
     fn update_triggers(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
-        todo!();
+        for trigger_index in 0..MAX_NUM_ACTIVE_TRIGGERS {
+            match self.active_triggers[trigger_index].mode {
+                TriggerMode::NoTrigger => self.update_tg_no_trigger(logical_strip),
+                TriggerMode::Background => self.update_tg_background(logical_strip),
+                TriggerMode::Foreground => self.update_tg_foreground(logical_strip),
+                TriggerMode::ColorPulse => self.update_tg_color_pulse(logical_strip),
+                TriggerMode::ColorPulseSlowFade => {
+                    self.update_tg_color_pulse_slow_fade(logical_strip)
+                }
+                TriggerMode::ColorPulsePalette => self.update_tg_color_pulse_palette(logical_strip),
+                TriggerMode::ColorShot => self.update_tg_color_shot(logical_strip),
+                TriggerMode::ColorShotSlowFade => {
+                    self.update_tg_color_shot_slow_fade(logical_strip)
+                }
+                TriggerMode::ColorShotPalette => self.update_tg_color_shot_palette(logical_strip),
+                TriggerMode::Flash => self.update_tg_flash(logical_strip),
+                TriggerMode::FlashSlowFade => self.update_tg_flash_slow_fade(logical_strip),
+                TriggerMode::FlashPalette => self.update_tg_flash_palette(logical_strip),
+            }
+        }
     }
 
     fn increment_bg_palette_index(&mut self) {
@@ -356,6 +382,78 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
     }
 
     fn update_bg_fill_palette_rotate(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
+    }
+
+    fn update_fg_no_foreground(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
+    }
+
+    fn update_fg_marquee_solid(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
+    }
+
+    fn update_fg_marquee_solid_fixed(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
+    }
+
+    fn update_fg_marquee_fade(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
+    }
+
+    fn update_fg_marquee_fade_fixed(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
+    }
+
+    fn update_fg_vu_meter(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
+    }
+
+    fn update_tg_no_trigger(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
+    }
+
+    fn update_tg_background(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
+    }
+
+    fn update_tg_foreground(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
+    }
+
+    fn update_tg_color_pulse(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
+    }
+
+    fn update_tg_color_pulse_slow_fade(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
+    }
+
+    fn update_tg_color_pulse_palette(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
+    }
+
+    fn update_tg_color_shot(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
+    }
+
+    fn update_tg_color_shot_slow_fade(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
+    }
+
+    fn update_tg_color_shot_palette(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
+    }
+
+    fn update_tg_flash(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
+    }
+
+    fn update_tg_flash_slow_fade(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
+    }
+
+    fn update_tg_flash_palette(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
         todo!()
     }
 }

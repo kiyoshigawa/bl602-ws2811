@@ -107,6 +107,10 @@ fn main() -> ! {
         .channel0
         .set_clock_source(ClockSource::Fclk(&clocks), 160_000_000_u32.Hz());
 
+    let mut timer_ch1 = timers
+        .channel1
+        .set_clock_source(ClockSource::Fclk(&clocks), 160_000_000_u32.Hz());
+
     // The order of pins here needs to match the array of strips passed into LogicalStrip::new()
     let pins: [DynamicPin; NUM_STRIPS] = [
         &mut gpio_pins.pin0.into_pull_down_output(),
@@ -131,7 +135,7 @@ fn main() -> ! {
 
     writeln!(serial, "Debug Serial Initialized...\r").ok();
 
-    let mut office_strip = strip::LogicalStrip::<NUM_LEDS>::new(&ALL_STRIPS);
+    let office_strip = strip::LogicalStrip::<NUM_LEDS>::new(&ALL_STRIPS);
 
     let mut hc = HardwareController::new(pins, timer_ch0);
 
@@ -145,13 +149,14 @@ fn main() -> ! {
     let a = a::Animation::new(a::ANI_TEST, translation_array);
     let animation_array = [a];
 
-    let mut lc = lc::LightingController::new(office_strip, animation_array, 60_u32.Hz());
+    let mut lc =
+        lc::LightingController::new(office_strip, animation_array, 60_u32.Hz(), &mut timer_ch1);
     // get a millisecond delay for use with test patterns:
     let mut d = bl602_hal::delay::McycleDelay::new(clocks.sysclk().0);
 
     loop {
-        writeln!(serial, "Still Loopin'\r").ok();
         lc.update(&mut hc);
-        d.delay_ms(1000).ok();
+        // writeln!(serial, "Still Loopin'\r").ok();
+        // d.delay_ms(1000).ok();
     }
 }

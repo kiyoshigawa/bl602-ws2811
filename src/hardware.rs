@@ -2,6 +2,7 @@ use crate::NUM_STRIPS;
 use bl602_hal::timer::{ConfiguredTimerChannel0, ConfiguredTimerChannel1, Preload};
 use core::convert::Infallible;
 use embedded_hal::digital::blocking::OutputPin;
+use embedded_hal::timer::nb;
 use embedded_time::duration::*;
 
 pub type DynamicPin<'a> = &'a mut dyn OutputPin<Error = Infallible>;
@@ -42,6 +43,11 @@ where
 pub trait PeriodicTimer {
     fn periodic_start(&mut self, time: impl Into<Nanoseconds<u64>>);
     fn periodic_wait(&mut self);
+    fn periodic_check_timeout(&mut self) -> Result<(), TimerError>;
+}
+
+pub enum TimerError {
+    WouldBlock,
 }
 
 macro_rules! setup_periodic_timer {
@@ -62,6 +68,15 @@ macro_rules! setup_periodic_timer {
                         self.clear_match2_interrupt();
                         break;
                     }
+                }
+            }
+
+            fn periodic_check_timeout(&mut self) -> Result<(), TimerError> {
+                if self.is_match2() {
+                    self.clear_match2_interrupt();
+                    return Ok(());
+                } else {
+                    return Err(TimerError::WouldBlock);
                 }
             }
         }

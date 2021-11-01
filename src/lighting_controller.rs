@@ -1,9 +1,7 @@
 use crate::animations as a;
-use crate::colors as c;
+use crate::hardware::{HardwareController, PeriodicTimer};
+use crate::leds::ws28xx::LogicalStrip;
 use embedded_time::rate::Hertz;
-
-/// Adjust MAX_NUM_* consts depending on RAM requirements:
-const MAX_NUM_ANIMATIONS: usize = 6;
 
 pub struct LightingController<
     'a,
@@ -13,8 +11,8 @@ pub struct LightingController<
     const N_LED: usize,
     const N_ANI: usize,
 > {
-    logical_strip: &'a mut [c::Color],
-    animations: [&'a mut a::Animation<N_BG, N_FG, N_TG, N_LED>; N_ANI],
+    logical_strip: LogicalStrip<'a, N_LED>,
+    animations: [a::Animation<N_BG, N_FG, N_TG, N_LED>; N_ANI],
     frame_rate: Hertz,
 }
 
@@ -28,10 +26,25 @@ impl<
     > LightingController<'a, N_FG, N_BG, N_TG, N_LED, N_ANI>
 {
     pub fn new(
-        logical_strip: &'a mut [c::Color],
-        animations: [&'a mut a::Animation<N_BG, N_FG, N_TG, N_LED>; N_ANI],
+        logical_strip: LogicalStrip<'a, N_LED>,
+        animations: [a::Animation<N_BG, N_FG, N_TG, N_LED>; N_ANI],
         frame_rate: impl Into<Hertz>,
     ) -> Self {
-        LightingController { logical_strip, animations, frame_rate: frame_rate.into() }
+        let frame_rate = frame_rate.into();
+        let mut lc = LightingController { logical_strip, animations, frame_rate };
+        for animation in lc.animations.iter_mut() {
+            animation.init_total_frames(lc.frame_rate);
+        }
+        lc
+    }
+
+    pub fn update<T>(&mut self, hc: &mut HardwareController<T>)
+    where
+        T: PeriodicTimer,
+    {
+        for animation in self.animations.iter_mut() {
+            animation.update(&mut self.logical_strip);
+        }
+        self.logical_strip.send_all_sequential(hc);
     }
 }

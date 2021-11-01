@@ -8,11 +8,9 @@ pub mod leds;
 pub mod lighting_controller;
 
 use crate::animations as a;
-use crate::colors as c;
 use crate::leds::ws28xx as strip;
 use crate::lighting_controller as lc;
 
-use crate::colors::{C_BLUE, C_GREEN, C_RED};
 use crate::hardware::{DynamicPin, HardwareController};
 use bl602_hal as hal;
 use core::fmt::Write;
@@ -116,26 +114,6 @@ fn main() -> ! {
         &mut gpio_pins.pin1.into_pull_down_output(),
     ];
 
-    let mut office_strip = strip::LogicalStrip::<NUM_LEDS>::new(&ALL_STRIPS);
-
-    let mut hc = HardwareController::new(pins, timer_ch0);
-
-    // For now, the translation array is just all the leds on the office_strip
-    let mut translation_array: [usize; NUM_LEDS] = [0; NUM_LEDS];
-    for (index, value) in translation_array.iter_mut().enumerate() {
-        *value = index;
-    }
-
-    // Make a single animation operating on the whole strip:
-    let mut a = a::Animation::new(a::ANI_TEST, translation_array);
-    let animation_array = [&mut a];
-
-    let lc = lc::LightingController::new(
-        office_strip.color_buffer.as_mut(),
-        animation_array,
-        60_u32.Hz(),
-    );
-
     // Set up uart output for debug printing. Since this microcontroller has a pin matrix,
     // we need to set up both the pins and the muxs
     let pin16 = gpio_pins.pin16.into_uart_sig0();
@@ -153,60 +131,27 @@ fn main() -> ! {
 
     writeln!(serial, "Debug Serial Initialized...\r").ok();
 
+    let mut office_strip = strip::LogicalStrip::<NUM_LEDS>::new(&ALL_STRIPS);
+
+    let mut hc = HardwareController::new(pins, timer_ch0);
+
+    // For now, the translation array is just all the leds on the office_strip
+    let mut translation_array: [usize; NUM_LEDS] = [0; NUM_LEDS];
+    for (index, value) in translation_array.iter_mut().enumerate() {
+        *value = index;
+    }
+
+    // Make a single animation operating on the whole strip:
+    let a = a::Animation::new(a::ANI_TEST, translation_array);
+    let animation_array = [a];
+
+    let mut lc = lc::LightingController::new(office_strip, animation_array, 60_u32.Hz());
     // get a millisecond delay for use with test patterns:
     let mut d = bl602_hal::delay::McycleDelay::new(clocks.sysclk().0);
 
-    // test color pattern before entering main program loop:
-    let mut color = c::C_RED;
-    office_strip.set_strip_to_solid_color(color);
-    office_strip.send_all_sequential(&mut hc);
-    d.delay_ms(1000).ok();
-    color = c::C_GREEN;
-    office_strip.set_strip_to_solid_color(color);
-    office_strip.send_all_sequential(&mut hc);
-    d.delay_ms(1000).ok();
-    color = c::C_BLUE;
-    office_strip.set_strip_to_solid_color(color);
-    office_strip.send_all_sequential(&mut hc);
-    d.delay_ms(1000).ok();
-    office_strip.set_strip_to_solid_color(c::C_OFF);
-    office_strip.send_all_sequential(&mut hc);
-    d.delay_ms(100).ok();
-
-    for i in 0..NUM_LEDS {
-        color = c::C_GREEN;
-        office_strip.set_strip_to_solid_color(c::C_OFF); // because lazy
-        office_strip.set_color_at_index(i, color);
-        office_strip.send_all_sequential(&mut hc);
-        d.delay_ms(100).ok();
-    }
-
-    for i in (0..NUM_LEDS).rev() {
-        color = c::C_BLUE;
-        office_strip.set_strip_to_solid_color(c::C_OFF); // because lazy
-        office_strip.set_color_at_index(i, color);
-        office_strip.send_all_sequential(&mut hc);
-        d.delay_ms(100).ok();
-    }
-
     loop {
-        for i in 0..1000 {
-            color = c::Color::color_lerp(i, 0, 1000, C_RED, C_GREEN);
-            office_strip.set_strip_to_solid_color(color);
-            office_strip.send_all_sequential(&mut hc);
-            d.delay_ms(25).ok();
-        }
-        for i in 0..1000 {
-            color = c::Color::color_lerp(i, 0, 1000, C_GREEN, C_BLUE);
-            office_strip.set_strip_to_solid_color(color);
-            office_strip.send_all_sequential(&mut hc);
-            d.delay_ms(25).ok();
-        }
-        for i in 0..1000 {
-            color = c::Color::color_lerp(i, 0, 1000, C_BLUE, C_RED);
-            office_strip.set_strip_to_solid_color(color);
-            office_strip.send_all_sequential(&mut hc);
-            d.delay_ms(25).ok();
-        }
+        writeln!(serial, "Still Loopin'\r").ok();
+        lc.update(&mut hc);
+        d.delay_ms(1000).ok();
     }
 }

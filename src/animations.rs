@@ -1,5 +1,11 @@
-use crate::colors::{C_OFF, R_OFF};
-use crate::{colors as c, NUM_LEDS};
+use crate::colors as c;
+use crate::leds::ws28xx::LogicalStrip;
+use embedded_time::rate::*;
+
+/// This value is used as a default value for the number of subdivisions on the const animations at
+/// the end of the file. Typically this number should be 0 for shorter strips, and higher as you add
+/// more LEDs. It controls how often the palette colors repeat over the entire length of LEDs.
+pub const DEFAULT_NUMBER_OF_SUBDIVISIONS: usize = 0;
 
 /// Adjust MAX_NUM_* consts depending on RAM requirements:
 const MAX_NUM_ACTIVE_TRIGGERS: usize = 10;
@@ -23,10 +29,12 @@ pub enum BackgroundMode {
 
     /// This will populate a palette's colors evenly across the LED in the animation in order. It
     /// does not animate once drawn.
+    /// When externally triggered, it moves to a random offset.
     FillPalette,
 
     /// This will populate a palette like above, but it will animate it by slowly offsetting the
     /// color pattern over time.
+    /// When externally triggered, it moves to a random offset.
     FillPaletteRotate,
 }
 
@@ -192,7 +200,8 @@ struct AnimationTriggerState {
     total_frames: u32,
     last_direction: Direction,
     color: c::Color,
-    is_complete: bool,
+    is_running: bool,
+    current_palette_color_index: usize,
 }
 
 impl AnimationTriggerState {
@@ -202,8 +211,9 @@ impl AnimationTriggerState {
             current_frame: 0,
             total_frames: 0,
             last_direction: Direction::Positive,
-            color: C_OFF,
-            is_complete: true,
+            color: c::C_OFF,
+            is_running: false,
+            current_palette_color_index: 0,
         }
     }
 }
@@ -228,7 +238,7 @@ pub struct Animation<const N_BG: usize, const N_FG: usize, const N_TG: usize, co
     led_position_array: [u16; N_LED],
     fg_state: AnimationState,
     bg_state: AnimationState,
-    active_triggers: [Option<AnimationTriggerState>; MAX_NUM_ACTIVE_TRIGGERS],
+    active_triggers: [AnimationTriggerState; MAX_NUM_ACTIVE_TRIGGERS],
 }
 
 impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize>
@@ -238,14 +248,115 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         parameters: AnimationParameters<N_BG, N_FG, N_TG>,
         translation_array: [usize; N_LED],
     ) -> Self {
+        // Generate the LED Position Array. This is constant for every Animation based on the
+        // number of LEDs <N_LED> in the animation. The LED positions are distributed evenly over
+        // the entire range from 0..u16:MAX, to increase the effective supersampling resolution of
+        // the animation.
+        let single_led_offset = u16::MAX / N_LED as u16;
+        let mut current_led_offset = 0;
+        let mut led_position_array = [0_u16; N_LED];
+        for led in led_position_array.iter_mut() {
+            *led = current_led_offset;
+            current_led_offset += single_led_offset;
+        }
         Animation {
             parameters,
             translation_array,
-            led_position_array: [0_u16; N_LED],
+            led_position_array,
             fg_state: AnimationState::default(),
             bg_state: AnimationState::default(),
-            active_triggers: [None, None, None, None, None, None, None, None, None, None],
+            // Figure out how to implement Clone for this later:
+            active_triggers: [
+                AnimationTriggerState::default(),
+                AnimationTriggerState::default(),
+                AnimationTriggerState::default(),
+                AnimationTriggerState::default(),
+                AnimationTriggerState::default(),
+                AnimationTriggerState::default(),
+                AnimationTriggerState::default(),
+                AnimationTriggerState::default(),
+                AnimationTriggerState::default(),
+                AnimationTriggerState::default(),
+            ],
         }
+    }
+
+    pub fn init_total_frames(&mut self, framerate: impl Into<Hertz>) {
+        let framerate = framerate.into();
+        self.bg_state.total_frames = (self.parameters.bg.duration_ns * framerate.integer() as u64
+            / 1_000_000_000_u64) as u32;
+        self.fg_state.total_frames = (self.parameters.fg.duration_ns * framerate.integer() as u64
+            / 1_000_000_000_u64) as u32;
+    }
+
+    pub fn update(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        // Update BG:
+        self.update_bg(logical_strip);
+        // Update FG:
+        // self.update_fg(logical_strip);
+        // Update Triggers:
+        // self.update_triggers(logical_strip);
+    }
+
+    fn update_bg(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        match self.parameters.bg.mode {
+            BackgroundMode::NoBackground => self.update_bg_no_background(logical_strip),
+            BackgroundMode::Solid => self.update_bg_solid(logical_strip),
+            BackgroundMode::SolidFade => self.update_bg_solid_fade(logical_strip),
+            BackgroundMode::FillPalette => self.update_bg_fill_palette(logical_strip),
+            BackgroundMode::FillPaletteRotate => self.update_bg_fill_palette_rotate(logical_strip),
+        }
+    }
+
+    fn update_fg(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!();
+    }
+
+    fn update_triggers(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!();
+    }
+
+    fn increment_bg_palette_index(&mut self) {
+        self.bg_state.current_palette_color_index =
+            (self.bg_state.current_palette_color_index + 1) % N_BG;
+    }
+
+    fn increment_fg_palette_index(&mut self) {
+        self.fg_state.current_palette_color_index =
+            (self.fg_state.current_palette_color_index + 1) % N_FG;
+    }
+
+    fn increment_trigger_palette_index(&mut self, trigger_index: usize) {
+        self.active_triggers[trigger_index].current_palette_color_index =
+            (self.active_triggers[trigger_index].current_palette_color_index + 1) % N_TG;
+    }
+
+    fn update_bg_no_background(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        for led_index in self.translation_array {
+            logical_strip.set_color_at_index(led_index, c::C_OFF);
+        }
+    }
+
+    fn update_bg_solid(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        for led_index in self.translation_array {
+            // Set all LEDs to the current rainbow color. Note that in this mode the color will only
+            // change when an external trigger of type `Background` is received.
+            let color_index = self.bg_state.current_palette_color_index;
+            let color = self.parameters.bg.palette.colors[color_index];
+            logical_strip.set_color_at_index(led_index, color);
+        }
+    }
+
+    fn update_bg_solid_fade(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
+    }
+
+    fn update_bg_fill_palette(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
+    }
+
+    fn update_bg_fill_palette_rotate(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        todo!()
     }
 }
 
@@ -255,27 +366,30 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
 /// This background parameter struct can be used to turn off all background effects
 pub const BG_OFF: AnimationBackgroundParameters<1> = AnimationBackgroundParameters {
     mode: BackgroundMode::NoBackground,
-    palette: c::R_OFF,
+    palette: c::P_OFF,
     direction: Direction::Stopped,
     is_palette_reversed: false,
     duration_ns: 0,
-    subdivisions: 0,
+    subdivisions: DEFAULT_NUMBER_OF_SUBDIVISIONS,
 };
 
 /// This foreground parameter struct can be used to turn off all foreground effects
 pub const FG_OFF: AnimationForegroundParameters<1> = AnimationForegroundParameters {
     mode: ForegroundMode::NoForeground,
-    palette: R_OFF,
+    palette: c::P_OFF,
     direction: Direction::Stopped,
     is_palette_reversed: false,
     duration_ns: 0,
     step_time_ns: 0,
-    subdivisions: 0,
+    subdivisions: DEFAULT_NUMBER_OF_SUBDIVISIONS,
 };
 
 /// This global trigger parameter struct can be used to turn off all trigger effects.
-pub const TRIGGER_OFF: AnimationGlobalTriggerParameters<1> =
-    AnimationGlobalTriggerParameters { palette: R_OFF, is_palette_reversed: false, duration_ns: 0 };
+pub const TRIGGER_OFF: AnimationGlobalTriggerParameters<1> = AnimationGlobalTriggerParameters {
+    palette: c::P_OFF,
+    is_palette_reversed: false,
+    duration_ns: 0,
+};
 
 /// This animation parameter struct will turn off ALL animations: fg, bg, and trigger.
 pub const ANI_ALL_OFF: AnimationParameters<1, 1, 1> =
@@ -284,27 +398,30 @@ pub const ANI_ALL_OFF: AnimationParameters<1, 1, 1> =
 /// This is an animation background struct used for testing
 pub const BG_TEST: AnimationBackgroundParameters<3> = AnimationBackgroundParameters {
     mode: BackgroundMode::Solid,
-    palette: c::R_ROYGBIV,
+    palette: c::P_ROYGBIV,
     direction: Direction::Positive,
     is_palette_reversed: false,
     duration_ns: 0,
-    subdivisions: 0,
+    subdivisions: DEFAULT_NUMBER_OF_SUBDIVISIONS,
 };
 
 /// This is an animation foreground struct used for testing
 pub const FG_TEST: AnimationForegroundParameters<1> = AnimationForegroundParameters {
     mode: ForegroundMode::NoForeground,
-    palette: R_OFF,
+    palette: c::P_OFF,
     direction: Direction::Stopped,
     is_palette_reversed: false,
     duration_ns: 0,
     step_time_ns: 0,
-    subdivisions: 0,
+    subdivisions: DEFAULT_NUMBER_OF_SUBDIVISIONS,
 };
 
 /// This is an animation trigger struct used for testing
-pub const TRIGGER_TEST: AnimationGlobalTriggerParameters<1> =
-    AnimationGlobalTriggerParameters { palette: R_OFF, is_palette_reversed: false, duration_ns: 0 };
+pub const TRIGGER_TEST: AnimationGlobalTriggerParameters<1> = AnimationGlobalTriggerParameters {
+    palette: c::P_OFF,
+    is_palette_reversed: false,
+    duration_ns: 0,
+};
 
 /// This animation parameter struct will turn off ALL animations: fg, bg, and trigger.
 pub const ANI_TEST: AnimationParameters<3, 1, 1> =

@@ -93,8 +93,8 @@ pub mod ws28xx {
     }
 
     pub struct LogicalStrip<'a, const NUM_LEDS: usize> {
-        pub color_buffer: [c::Color; NUM_LEDS],
-        pub strips: &'a [PhysicalStrip],
+        color_buffer: [c::Color; NUM_LEDS],
+        strips: &'a [PhysicalStrip],
     }
 
     impl<'a, const NUM_LEDS: usize> LogicalStrip<'a, NUM_LEDS> {

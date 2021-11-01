@@ -53,7 +53,9 @@ where
         lc
     }
 
-    pub fn init(&mut self) {}
+    pub fn trigger(&mut self, animation_index: usize, params: &a::AnimationTriggerParameters) {
+        self.animations[animation_index].trigger(params);
+    }
 
     pub fn update<TimerHc>(&mut self, hc: &mut HardwareController<TimerHc>)
     where

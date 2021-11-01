@@ -142,39 +142,39 @@ pub enum Direction {
 /// holding the parameters for the foreground animation, the background animation, and the global
 /// information for trigger animations (such as the trigger Palette)
 pub struct AnimationParameters<const N_BG: usize, const N_FG: usize, const N_TG: usize> {
-    bg: AnimationBackgroundParameters<N_BG>,
-    fg: AnimationForegroundParameters<N_FG>,
-    trigger: AnimationGlobalTriggerParameters<N_TG>,
+    pub bg: AnimationBackgroundParameters<N_BG>,
+    pub fg: AnimationForegroundParameters<N_FG>,
+    pub trigger: AnimationGlobalTriggerParameters<N_TG>,
 }
 
 /// This contains all the information necessary to set up and run a background animation. All
 /// aspects of the animation can be derived from these parameters.
 pub struct AnimationBackgroundParameters<const N: usize> {
-    mode: BackgroundMode,
-    palette: c::Palette<N>,
-    direction: Direction,
-    is_palette_reversed: bool,
-    duration_ns: u64,
-    subdivisions: usize,
+    pub mode: BackgroundMode,
+    pub palette: c::Palette<N>,
+    pub direction: Direction,
+    pub is_palette_reversed: bool,
+    pub duration_ns: u64,
+    pub subdivisions: usize,
 }
 
 /// This contains all the information necessary to set up and run a foreground animation. All
 /// aspects of the animation can be derived from these parameters.
 pub struct AnimationForegroundParameters<const N: usize> {
-    mode: ForegroundMode,
-    palette: c::Palette<N>,
-    direction: Direction,
-    is_palette_reversed: bool,
-    duration_ns: u64,
-    step_time_ns: u64,
-    subdivisions: usize,
+    pub mode: ForegroundMode,
+    pub palette: c::Palette<N>,
+    pub direction: Direction,
+    pub is_palette_reversed: bool,
+    pub duration_ns: u64,
+    pub step_time_ns: u64,
+    pub subdivisions: usize,
 }
 
 /// All triggers share a single palette / slow fade speed, which is configured in this struct
 pub struct AnimationGlobalTriggerParameters<const N: usize> {
-    palette: c::Palette<N>,
-    is_palette_reversed: bool,
-    duration_ns: u64,
+    pub palette: c::Palette<N>,
+    pub is_palette_reversed: bool,
+    pub duration_ns: u64,
 }
 
 /// This contains all the information necessary to set up and run a trigger animation. All
@@ -182,12 +182,12 @@ pub struct AnimationGlobalTriggerParameters<const N: usize> {
 /// AnimationGlobalTriggerParameters struct's parameters. Some parameters will not have an
 /// effect depending on the mode.
 pub struct AnimationTriggerParameters {
-    mode: TriggerMode,
-    direction: Direction,
-    step_time_ns: u64,
-    fade_in_time_ns: u64,
-    fade_out_time_ns: u64,
-    starting_offset: u16,
+    pub mode: TriggerMode,
+    pub direction: Direction,
+    pub step_time_ns: u64,
+    pub fade_in_time_ns: u64,
+    pub fade_out_time_ns: u64,
+    pub starting_offset: u16,
 }
 
 /// This contains all the information needed to keep track of the current state of a trigger
@@ -226,6 +226,7 @@ struct AnimationState {
     current_frame: u32,
     total_frames: u32,
     current_palette_color_index: usize,
+    has_been_triggered: bool,
 }
 
 /// This struct contains all the fixed parameters of an animation, as well as the state of the
@@ -342,6 +343,19 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         }
     }
 
+    pub fn trigger(&mut self, params: &AnimationTriggerParameters) {
+        match params.mode {
+            TriggerMode::NoTrigger => {}
+            TriggerMode::Background => {
+                self.bg_state.has_been_triggered = true;
+            }
+            TriggerMode::Foreground => {
+                self.fg_state.has_been_triggered = true;
+            }
+            _ => todo!(),
+        }
+    }
+
     fn increment_bg_palette_index(&mut self) {
         self.bg_state.current_palette_color_index =
             (self.bg_state.current_palette_color_index + 1) % N_BG;
@@ -367,6 +381,10 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         for led_index in self.translation_array {
             // Set all LEDs to the current rainbow color. Note that in this mode the color will only
             // change when an external trigger of type `Background` is received.
+            if self.bg_state.has_been_triggered {
+                self.increment_bg_palette_index();
+                self.bg_state.has_been_triggered = false;
+            }
             let color_index = self.bg_state.current_palette_color_index;
             let color = self.parameters.bg.palette.colors[color_index];
             logical_strip.set_color_at_index(led_index, color);

@@ -151,12 +151,22 @@ fn main() -> ! {
 
     let mut lc =
         lc::LightingController::new(office_strip, animation_array, 60_u32.Hz(), &mut timer_ch1);
+
     // get a millisecond delay for use with test patterns:
     let mut d = bl602_hal::delay::McycleDelay::new(clocks.sysclk().0);
 
+    let test_trigger = a::AnimationTriggerParameters {
+        mode: a::TriggerMode::Background,
+        direction: a::Direction::Stopped,
+        step_time_ns: 0,
+        fade_in_time_ns: 0,
+        fade_out_time_ns: 0,
+        starting_offset: 0,
+    };
+
     loop {
         lc.update(&mut hc);
-        // writeln!(serial, "Still Loopin'\r").ok();
-        // d.delay_ms(1000).ok();
+        lc.trigger(0, &test_trigger);
+        d.delay_ms(1000).ok();
     }
 }

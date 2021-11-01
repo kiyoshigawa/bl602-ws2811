@@ -2,7 +2,6 @@ use crate::NUM_STRIPS;
 use bl602_hal::timer::{ConfiguredTimerChannel0, ConfiguredTimerChannel1, Preload};
 use core::convert::Infallible;
 use embedded_hal::digital::blocking::OutputPin;
-use embedded_hal::timer::nb;
 use embedded_time::duration::*;
 
 pub type DynamicPin<'a> = &'a mut dyn OutputPin<Error = Infallible>;

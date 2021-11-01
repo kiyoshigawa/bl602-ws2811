@@ -362,6 +362,8 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         if self.bg_state.total_frames != 0 {
             self.bg_state.current_frame =
                 (self.bg_state.current_frame + 1) % self.bg_state.total_frames;
+        } else {
+            self.bg_state.current_frame = 0
         }
     }
 
@@ -369,6 +371,8 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         if self.fg_state.total_frames != 0 {
             self.fg_state.current_frame =
                 (self.fg_state.current_frame + 1) % self.fg_state.total_frames;
+        } else {
+            self.fg_state.current_frame = 0
         }
     }
 
@@ -376,6 +380,8 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         if N_BG != 0 {
             self.bg_state.current_palette_color_index =
                 (self.bg_state.current_palette_color_index + 1) % N_BG;
+        } else {
+            self.bg_state.current_palette_color_index = 0
         }
     }
 
@@ -383,6 +389,8 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         if N_FG != 0 {
             self.fg_state.current_palette_color_index =
                 (self.fg_state.current_palette_color_index + 1) % N_FG;
+        } else {
+            self.fg_state.current_palette_color_index = 0
         }
     }
 
@@ -390,6 +398,8 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         if N_TG != 0 {
             self.active_triggers[trigger_index].current_palette_color_index =
                 (self.active_triggers[trigger_index].current_palette_color_index + 1) % N_TG;
+        } else {
+            self.active_triggers[trigger_index].current_palette_color_index = 0
         }
     }
 

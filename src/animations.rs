@@ -24,7 +24,7 @@ pub enum BackgroundMode {
 
     /// This will slowly fade all the leds as a single color fading through the colors of a palette.
     /// Color offset can be externally triggered to the next color in the palette, or will move
-    /// at a constant rate.
+    /// at a constant rate, changing one color per `duration_ns` sized time step.
     SolidFade,
 
     /// This will populate a palette's colors evenly across the LED in the animation in order. It
@@ -356,20 +356,44 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         }
     }
 
+    // Incrementers:
+
+    fn increment_bg_frames(&mut self) {
+        if self.bg_state.total_frames != 0 {
+            self.bg_state.current_frame =
+                (self.bg_state.current_frame + 1) % self.bg_state.total_frames;
+        }
+    }
+
+    fn increment_fg_frames(&mut self) {
+        if self.fg_state.total_frames != 0 {
+            self.fg_state.current_frame =
+                (self.fg_state.current_frame + 1) % self.fg_state.total_frames;
+        }
+    }
+
     fn increment_bg_palette_index(&mut self) {
-        self.bg_state.current_palette_color_index =
-            (self.bg_state.current_palette_color_index + 1) % N_BG;
+        if N_BG != 0 {
+            self.bg_state.current_palette_color_index =
+                (self.bg_state.current_palette_color_index + 1) % N_BG;
+        }
     }
 
     fn increment_fg_palette_index(&mut self) {
-        self.fg_state.current_palette_color_index =
-            (self.fg_state.current_palette_color_index + 1) % N_FG;
+        if N_FG != 0 {
+            self.fg_state.current_palette_color_index =
+                (self.fg_state.current_palette_color_index + 1) % N_FG;
+        }
     }
 
     fn increment_trigger_palette_index(&mut self, trigger_index: usize) {
-        self.active_triggers[trigger_index].current_palette_color_index =
-            (self.active_triggers[trigger_index].current_palette_color_index + 1) % N_TG;
+        if N_TG != 0 {
+            self.active_triggers[trigger_index].current_palette_color_index =
+                (self.active_triggers[trigger_index].current_palette_color_index + 1) % N_TG;
+        }
     }
+
+    // Backgrounds:
 
     fn update_bg_no_background(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
         for led_index in self.translation_array {
@@ -378,21 +402,45 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
     }
 
     fn update_bg_solid(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        if self.bg_state.has_been_triggered {
+            self.increment_bg_palette_index();
+            self.bg_state.has_been_triggered = false;
+        }
+        // Set all LEDs to the current rainbow color. Note that in this mode the color will only
+        // change when an external trigger of type `Background` is received.
+        let color_index = self.bg_state.current_palette_color_index;
+        let color = self.parameters.bg.palette.colors[color_index];
         for led_index in self.translation_array {
-            // Set all LEDs to the current rainbow color. Note that in this mode the color will only
-            // change when an external trigger of type `Background` is received.
-            if self.bg_state.has_been_triggered {
-                self.increment_bg_palette_index();
-                self.bg_state.has_been_triggered = false;
-            }
-            let color_index = self.bg_state.current_palette_color_index;
-            let color = self.parameters.bg.palette.colors[color_index];
             logical_strip.set_color_at_index(led_index, color);
         }
     }
 
     fn update_bg_solid_fade(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
-        todo!()
+        if self.bg_state.has_been_triggered {
+            self.increment_bg_palette_index();
+            self.bg_state.current_frame = 0;
+            self.bg_state.has_been_triggered = false;
+        }
+        let previous_frame = self.bg_state.current_frame;
+        self.increment_bg_frames();
+        // Check to see when the color rolls over:
+        if self.bg_state.current_frame < previous_frame {
+            self.increment_bg_palette_index();
+        }
+        let current_color =
+            self.parameters.bg.palette.colors[self.bg_state.current_palette_color_index];
+        let next_color = self.parameters.bg.palette.colors
+            [(self.bg_state.current_palette_color_index + 1) % N_BG];
+        let intermediate_color = c::Color::color_lerp(
+            self.bg_state.current_frame as i32,
+            0,
+            self.bg_state.total_frames as i32,
+            current_color,
+            next_color,
+        );
+        for led_index in self.translation_array {
+            logical_strip.set_color_at_index(led_index, intermediate_color);
+        }
     }
 
     fn update_bg_fill_palette(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
@@ -403,8 +451,10 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         todo!()
     }
 
+    // Foregrounds:
+
     fn update_fg_no_foreground(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
-        todo!()
+        // Do Nothing
     }
 
     fn update_fg_marquee_solid(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
@@ -427,8 +477,10 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         todo!()
     }
 
+    // Triggers:
+
     fn update_tg_no_trigger(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
-        todo!()
+        // Do Nothing
     }
 
     fn update_tg_background(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
@@ -513,11 +565,11 @@ pub const ANI_ALL_OFF: AnimationParameters<1, 1, 1> =
 
 /// This is an animation background struct used for testing
 pub const BG_TEST: AnimationBackgroundParameters<3> = AnimationBackgroundParameters {
-    mode: BackgroundMode::Solid,
+    mode: BackgroundMode::SolidFade,
     palette: c::P_ROYGBIV,
     direction: Direction::Positive,
     is_palette_reversed: false,
-    duration_ns: 0,
+    duration_ns: 10_000_000_000,
     subdivisions: DEFAULT_NUMBER_OF_SUBDIVISIONS,
 };
 

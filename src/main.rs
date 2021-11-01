@@ -166,7 +166,7 @@ fn main() -> ! {
 
     loop {
         lc.update(&mut hc);
-        lc.trigger(0, &test_trigger);
-        d.delay_ms(1000).ok();
+        // lc.trigger(0, &test_trigger);
+        // d.delay_ms(1000).ok();
     }
 }

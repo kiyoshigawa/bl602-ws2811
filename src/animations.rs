@@ -204,19 +204,16 @@ struct AnimationTriggerState {
     current_palette_color_index: usize,
 }
 
-impl AnimationTriggerState {
-    fn default() -> Self {
-        AnimationTriggerState {
-            mode: TriggerMode::NoTrigger,
-            current_frame: 0,
-            total_frames: 0,
-            last_direction: Direction::Positive,
-            color: c::C_OFF,
-            is_running: false,
-            current_palette_color_index: 0,
-        }
-    }
-}
+/// Used to initialize the array of trigger states to the default value.
+const DEFAULT_TRIGGER: AnimationTriggerState = AnimationTriggerState {
+    mode: TriggerMode::NoTrigger,
+    current_frame: 0,
+    total_frames: 0,
+    last_direction: Direction::Positive,
+    color: c::C_OFF,
+    is_running: false,
+    current_palette_color_index: 0,
+};
 
 /// This contains all the information needed to keep track of the current state of a foreground or
 /// background animation. It is updated every frame to match the current state of the animation.
@@ -266,19 +263,7 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
             led_position_array,
             fg_state: AnimationState::default(),
             bg_state: AnimationState::default(),
-            // Figure out how to implement Clone for this later:
-            active_triggers: [
-                AnimationTriggerState::default(),
-                AnimationTriggerState::default(),
-                AnimationTriggerState::default(),
-                AnimationTriggerState::default(),
-                AnimationTriggerState::default(),
-                AnimationTriggerState::default(),
-                AnimationTriggerState::default(),
-                AnimationTriggerState::default(),
-                AnimationTriggerState::default(),
-                AnimationTriggerState::default(),
-            ],
+            active_triggers: [DEFAULT_TRIGGER; MAX_NUM_ACTIVE_TRIGGERS],
         }
     }
 

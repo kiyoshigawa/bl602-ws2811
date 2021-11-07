@@ -1,6 +1,6 @@
-use crate::colors as c;
 use crate::colors::Color;
 use crate::leds::ws28xx::LogicalStrip;
+use crate::{colors as c, NUM_LEDS};
 use embedded_time::rate::*;
 
 /// This value is used as a default value for the number of subdivisions on the const animations at
@@ -549,14 +549,69 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
     }
 
     fn fill_bg_rainbow(&mut self, start_offset: u16, logical_strip: &mut LogicalStrip<N_LED>) {
+        self.increment_bg_frames();
         // Always start with the first color of the rainbow:
         self.bg_state.current_rainbow_color_index = 0;
 
-        // We will need to know the distance between each color fo the rainbow, and this will need
+        // We will need to know the distance between each color of the rainbow, and this will need
         // to take into account that the rainbow will be repeated by the number of subdivisions in
         // the bg parameters:
         let distance_between_colors =
-            MAX_OFFSET / (N_BG as u16 * self.parameters.bg.subdivisions as u16);
+            MAX_OFFSET as u32 / (N_BG as u32 * (self.parameters.bg.subdivisions + 1) as u32);
+        let mut num_leds_set = 0;
+        let total_num_rainbow_colors = N_BG * (self.parameters.bg.subdivisions + 1);
+        let mut all_leds_are_set = false;
+        for color_index in 0..total_num_rainbow_colors {
+            // initialize for the section between two colors:
+            let current_color = self.get_current_bg_rainbow_color();
+            let next_color = self.get_next_bg_rainbow_color();
+            // Positions can be larger than MAX_OFFSET so that the interpolation is easier on a per-LED basis.
+            let current_color_position =
+                start_offset as u32 + (color_index as u32 * distance_between_colors);
+            let next_color_position = start_offset as u32
+                + (color_index as u32 * distance_between_colors)
+                + distance_between_colors as u32;
+            let mut mid_color: Color;
+
+            // Iterate over all the LEDs twice and work only on the ones with a position between
+            for led_index in 0..(N_LED * 2) {
+                // First get a 'corrected' LED position that takes the double length of the position
+                // array into account:
+                let corrected_led_offset = if led_index < N_LED {
+                    self.led_position_array[led_index] as u32
+                } else {
+                    self.led_position_array[led_index - N_LED] as u32 + MAX_OFFSET as u32
+                };
+                // only set LED values if the LED position falls between the current and next color:
+                if corrected_led_offset >= current_color_position
+                    && corrected_led_offset < next_color_position
+                {
+                    // Get the index of the LED in the LogicalStrip:
+                    let current_led_index = self.translation_array[led_index % N_LED];
+                    // Calculate the color at the LED using the position and color info:
+                    mid_color = c::Color::color_lerp(
+                        corrected_led_offset as i32,
+                        current_color_position as i32,
+                        next_color_position as i32,
+                        current_color,
+                        next_color,
+                    );
+                    // Set the LED color on the logical strip:
+                    logical_strip.set_color_at_index(current_led_index, mid_color);
+                    num_leds_set += 1;
+                    // Check to see if we've set all LEDS:
+                    if num_leds_set >= N_LED {
+                        // Stop iterating once all LEDs are set:
+                        all_leds_are_set = true;
+                        break;
+                    }
+                }
+            } // LED for loop
+            self.advance_bg_rainbow_index();
+            if all_leds_are_set {
+                break;
+            }
+        } // color for loop
     }
 
     // Backgrounds:
@@ -740,12 +795,12 @@ pub const ANI_ALL_OFF: AnimationParameters<1, 1, 1> =
 
 /// This is an animation background struct used for testing
 pub const BG_TEST: AnimationBackgroundParameters<3> = AnimationBackgroundParameters {
-    mode: BackgroundMode::SolidFade,
+    mode: BackgroundMode::FillRainbowRotate,
     rainbow: c::R_ROYGBIV,
     direction: Direction::Positive,
-    is_rainbow_reversed: true,
-    duration_ns: 10_000_000_000,
-    subdivisions: DEFAULT_NUMBER_OF_SUBDIVISIONS,
+    is_rainbow_reversed: false,
+    duration_ns: 60_000_000_000,
+    subdivisions: 0,
 };
 
 /// This is an animation foreground struct used for testing

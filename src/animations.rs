@@ -1,10 +1,11 @@
 use crate::colors as c;
+use crate::colors::Color;
 use crate::leds::ws28xx::LogicalStrip;
 use embedded_time::rate::*;
 
 /// This value is used as a default value for the number of subdivisions on the const animations at
 /// the end of the file. Typically this number should be 0 for shorter strips, and higher as you add
-/// more LEDs. It controls how often the palette colors repeat over the entire length of LEDs.
+/// more LEDs. It controls how often the rainbow colors repeat over the entire length of LEDs.
 pub const DEFAULT_NUMBER_OF_SUBDIVISIONS: usize = 0;
 
 /// Adjust MAX_NUM_* consts depending on RAM requirements:
@@ -18,24 +19,24 @@ pub enum BackgroundMode {
     NoBackground,
 
     /// This shows a solid unchanging color on all the leds in the background. The color will be the
-    /// first in the palette. You can step to other colors in the palette by external trigger,
+    /// first in the rainbow. You can step to other colors in the rainbow by external trigger,
     /// otherwise it does not change.
     Solid,
 
-    /// This will slowly fade all the leds as a single color fading through the colors of a palette.
-    /// Color offset can be externally triggered to the next color in the palette, or will move
+    /// This will slowly fade all the leds as a single color fading through the colors of a rainbow.
+    /// Color offset can be externally triggered to the next color in the rainbow, or will move
     /// at a constant rate, changing one color per `duration_ns` sized time step.
     SolidFade,
 
-    /// This will populate a palette's colors evenly across the LED in the animation in order. It
+    /// This will populate a rainbow's colors evenly across the LED in the animation in order. It
     /// does not animate once drawn.
     /// When externally triggered, it moves to a random offset.
-    FillPalette,
+    FillRainbow,
 
-    /// This will populate a palette like above, but it will animate it by slowly offsetting the
+    /// This will populate a rainbow like above, but it will animate it by slowly offsetting the
     /// color pattern over time.
     /// When externally triggered, it moves to a random offset.
-    FillPaletteRotate,
+    FillRainbowRotate,
 }
 
 /// Foreground modes are rendered second, and will animate over the background animation layer but
@@ -45,25 +46,25 @@ pub enum ForegroundMode {
     /// This is a mode that has no additional foreground animation over the background animation.
     NoForeground,
 
-    /// This will display a single-color marquee style pixel chase animation using palette
-    /// colors. The foreground trigger will advance to the next color of the palette.
+    /// This will display a single-color marquee style pixel chase animation using rainbow
+    /// colors. The foreground trigger will advance to the next color of the rainbow.
     MarqueeSolid,
 
     /// This will display a fixed pattern the same as a marquee chase animation that will only
     /// move if the offset is changed manually where the color is always a solid constant color.
-    /// The foreground trigger will advance to the next color of the palette.
+    /// The foreground trigger will advance to the next color of the rainbow.
     MarqueeSolidFixed,
 
     /// This will display a marquee style animation where the color of all the LEDs slowly fades
-    /// through the colors of a palette. It will advance to the next color if externally triggered.
+    /// through the colors of a rainbow. It will advance to the next color if externally triggered.
     MarqueeFade,
 
     /// This will display a fixed pattern the same as a marquee chase animation that will only move
     /// if the offset is changed manually where the color of all the LEDs slowly fades through the
-    /// colors of a palette. It will advance to the next color if externally triggered.
+    /// colors of a rainbow. It will advance to the next color if externally triggered.
     MarqueeFadeFixed,
 
-    /// This will render the foreground palette based on the offset value, and leave LEDs below
+    /// This will render the foreground rainbow based on the offset value, and leave LEDs below
     /// the offset value alone.
     VUMeter,
 }
@@ -96,9 +97,9 @@ pub enum TriggerMode {
 
     /// This will cause a pulse of to appear somewhere randomly along the led array.
     /// It will fade in, then fade back out one time per trigger.
-    /// Each pulse will be a new color in the order of the palette.
+    /// Each pulse will be a new color in the order of the rainbow.
     /// fade in and out times can be adjusted separately.
-    ColorPulsePalette,
+    ColorPulseRainbow,
 
     /// This will cause colored pulses of a single color to run down the LED strip.
     /// The starting offset and direction can be specified manually.
@@ -112,8 +113,8 @@ pub enum TriggerMode {
     ColorShotSlowFade,
 
     /// This will fire off color pulses with a new color for each pulse, in the order of the colors
-    /// of a palette.
-    ColorShotPalette,
+    /// of a rainbow.
+    ColorShotRainbow,
 
     /// This will flash all the LEDs to a single color for a short time.
     /// Fade in and out times can be adjusted separately.
@@ -127,8 +128,8 @@ pub enum TriggerMode {
     FlashSlowFade,
 
     /// This will flash all the LEDs to a single slow-fading color for a short time.
-    /// Each flash will be a new color in the order of the palette.
-    FlashPalette,
+    /// Each flash will be a new color in the order of the rainbow.
+    FlashRainbow,
 }
 
 /// Denotes the direction of animations, effects vary depending on animation modes:
@@ -140,7 +141,7 @@ pub enum Direction {
 
 /// This holds the parameters that define everything needed to set up an animation. It's a struct
 /// holding the parameters for the foreground animation, the background animation, and the global
-/// information for trigger animations (such as the trigger Palette)
+/// information for trigger animations (such as the trigger Rainbow)
 pub struct AnimationParameters<const N_BG: usize, const N_FG: usize, const N_TG: usize> {
     pub bg: AnimationBackgroundParameters<N_BG>,
     pub fg: AnimationForegroundParameters<N_FG>,
@@ -151,9 +152,9 @@ pub struct AnimationParameters<const N_BG: usize, const N_FG: usize, const N_TG:
 /// aspects of the animation can be derived from these parameters.
 pub struct AnimationBackgroundParameters<const N: usize> {
     pub mode: BackgroundMode,
-    pub palette: c::Palette<N>,
+    pub rainbow: c::Rainbow<N>,
     pub direction: Direction,
-    pub is_palette_reversed: bool,
+    pub is_rainbow_reversed: bool,
     pub duration_ns: u64,
     pub subdivisions: usize,
 }
@@ -162,18 +163,18 @@ pub struct AnimationBackgroundParameters<const N: usize> {
 /// aspects of the animation can be derived from these parameters.
 pub struct AnimationForegroundParameters<const N: usize> {
     pub mode: ForegroundMode,
-    pub palette: c::Palette<N>,
+    pub rainbow: c::Rainbow<N>,
     pub direction: Direction,
-    pub is_palette_reversed: bool,
+    pub is_rainbow_reversed: bool,
     pub duration_ns: u64,
     pub step_time_ns: u64,
     pub subdivisions: usize,
 }
 
-/// All triggers share a single palette / slow fade speed, which is configured in this struct
+/// All triggers share a single rainbow / slow fade speed, which is configured in this struct
 pub struct AnimationGlobalTriggerParameters<const N: usize> {
-    pub palette: c::Palette<N>,
-    pub is_palette_reversed: bool,
+    pub rainbow: c::Rainbow<N>,
+    pub is_rainbow_reversed: bool,
     pub duration_ns: u64,
 }
 
@@ -201,7 +202,7 @@ struct AnimationTriggerState {
     last_direction: Direction,
     color: c::Color,
     is_running: bool,
-    current_palette_color_index: usize,
+    current_rainbow_color_index: usize,
 }
 
 /// Used to initialize the array of trigger states to the default value.
@@ -212,7 +213,7 @@ const DEFAULT_TRIGGER: AnimationTriggerState = AnimationTriggerState {
     last_direction: Direction::Positive,
     color: c::C_OFF,
     is_running: false,
-    current_palette_color_index: 0,
+    current_rainbow_color_index: 0,
 };
 
 /// This contains all the information needed to keep track of the current state of a foreground or
@@ -222,7 +223,7 @@ struct AnimationState {
     offset: u16,
     current_frame: u32,
     total_frames: u32,
-    current_palette_color_index: usize,
+    current_rainbow_color_index: usize,
     has_been_triggered: bool,
 }
 
@@ -289,8 +290,8 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
             BackgroundMode::NoBackground => self.update_bg_no_background(logical_strip),
             BackgroundMode::Solid => self.update_bg_solid(logical_strip),
             BackgroundMode::SolidFade => self.update_bg_solid_fade(logical_strip),
-            BackgroundMode::FillPalette => self.update_bg_fill_palette(logical_strip),
-            BackgroundMode::FillPaletteRotate => self.update_bg_fill_palette_rotate(logical_strip),
+            BackgroundMode::FillRainbow => self.update_bg_fill_rainbow(logical_strip),
+            BackgroundMode::FillRainbowRotate => self.update_bg_fill_rainbow_rotate(logical_strip),
         }
     }
 
@@ -315,15 +316,15 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
                 TriggerMode::ColorPulseSlowFade => {
                     self.update_tg_color_pulse_slow_fade(logical_strip)
                 }
-                TriggerMode::ColorPulsePalette => self.update_tg_color_pulse_palette(logical_strip),
+                TriggerMode::ColorPulseRainbow => self.update_tg_color_pulse_rainbow(logical_strip),
                 TriggerMode::ColorShot => self.update_tg_color_shot(logical_strip),
                 TriggerMode::ColorShotSlowFade => {
                     self.update_tg_color_shot_slow_fade(logical_strip)
                 }
-                TriggerMode::ColorShotPalette => self.update_tg_color_shot_palette(logical_strip),
+                TriggerMode::ColorShotRainbow => self.update_tg_color_shot_rainbow(logical_strip),
                 TriggerMode::Flash => self.update_tg_flash(logical_strip),
                 TriggerMode::FlashSlowFade => self.update_tg_flash_slow_fade(logical_strip),
-                TriggerMode::FlashPalette => self.update_tg_flash_palette(logical_strip),
+                TriggerMode::FlashRainbow => self.update_tg_flash_rainbow(logical_strip),
             }
         }
     }
@@ -361,30 +362,38 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         }
     }
 
-    fn increment_bg_palette_index(&mut self) {
+    fn increment_bg_rainbow_index(&mut self) {
         if N_BG != 0 {
-            self.bg_state.current_palette_color_index =
-                (self.bg_state.current_palette_color_index + 1) % N_BG;
+            self.bg_state.current_rainbow_color_index =
+                (self.bg_state.current_rainbow_color_index + 1) % N_BG;
         } else {
-            self.bg_state.current_palette_color_index = 0
+            self.bg_state.current_rainbow_color_index = 0
         }
     }
 
-    fn increment_fg_palette_index(&mut self) {
+    fn increment_fg_rainbow_index(&mut self) {
         if N_FG != 0 {
-            self.fg_state.current_palette_color_index =
-                (self.fg_state.current_palette_color_index + 1) % N_FG;
+            self.fg_state.current_rainbow_color_index =
+                (self.fg_state.current_rainbow_color_index + 1) % N_FG;
         } else {
-            self.fg_state.current_palette_color_index = 0
+            self.fg_state.current_rainbow_color_index = 0
         }
     }
 
-    fn increment_trigger_palette_index(&mut self, trigger_index: usize) {
+    fn increment_trigger_rainbow_index(&mut self, trigger_index: usize) {
         if N_TG != 0 {
-            self.active_triggers[trigger_index].current_palette_color_index =
-                (self.active_triggers[trigger_index].current_palette_color_index + 1) % N_TG;
+            self.active_triggers[trigger_index].current_rainbow_color_index =
+                (self.active_triggers[trigger_index].current_rainbow_color_index + 1) % N_TG;
         } else {
-            self.active_triggers[trigger_index].current_palette_color_index = 0
+            self.active_triggers[trigger_index].current_rainbow_color_index = 0
+        }
+    }
+
+    // Fills:
+
+    fn fill_solid(&mut self, color: Color, logical_strip: &mut LogicalStrip<{ N_LED }>) {
+        for led_index in self.translation_array {
+            logical_strip.set_color_at_index(led_index, color);
         }
     }
 
@@ -398,21 +407,19 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
 
     fn update_bg_solid(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
         if self.bg_state.has_been_triggered {
-            self.increment_bg_palette_index();
+            self.increment_bg_rainbow_index();
             self.bg_state.has_been_triggered = false;
         }
         // Set all LEDs to the current rainbow color. Note that in this mode the color will only
         // change when an external trigger of type `Background` is received.
-        let color_index = self.bg_state.current_palette_color_index;
-        let color = self.parameters.bg.palette.colors[color_index];
-        for led_index in self.translation_array {
-            logical_strip.set_color_at_index(led_index, color);
-        }
+        let color_index = self.bg_state.current_rainbow_color_index;
+        let color = self.parameters.bg.rainbow.colors[color_index];
+        self.fill_solid(color, logical_strip)
     }
 
     fn update_bg_solid_fade(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
         if self.bg_state.has_been_triggered {
-            self.increment_bg_palette_index();
+            self.increment_bg_rainbow_index();
             self.bg_state.current_frame = 0;
             self.bg_state.has_been_triggered = false;
         }
@@ -420,12 +427,12 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         self.increment_bg_frames();
         // Check to see when the color rolls over:
         if self.bg_state.current_frame < previous_frame {
-            self.increment_bg_palette_index();
+            self.increment_bg_rainbow_index();
         }
         let current_color =
-            self.parameters.bg.palette.colors[self.bg_state.current_palette_color_index];
-        let next_color = self.parameters.bg.palette.colors
-            [(self.bg_state.current_palette_color_index + 1) % N_BG];
+            self.parameters.bg.rainbow.colors[self.bg_state.current_rainbow_color_index];
+        let next_color = self.parameters.bg.rainbow.colors
+            [(self.bg_state.current_rainbow_color_index + 1) % N_BG];
         let intermediate_color = c::Color::color_lerp(
             self.bg_state.current_frame as i32,
             0,
@@ -438,11 +445,11 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         }
     }
 
-    fn update_bg_fill_palette(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+    fn update_bg_fill_rainbow(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
         todo!()
     }
 
-    fn update_bg_fill_palette_rotate(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+    fn update_bg_fill_rainbow_rotate(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
         todo!()
     }
 
@@ -494,7 +501,7 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         todo!()
     }
 
-    fn update_tg_color_pulse_palette(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+    fn update_tg_color_pulse_rainbow(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
         todo!()
     }
 
@@ -506,7 +513,7 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         todo!()
     }
 
-    fn update_tg_color_shot_palette(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+    fn update_tg_color_shot_rainbow(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
         todo!()
     }
 
@@ -518,7 +525,7 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         todo!()
     }
 
-    fn update_tg_flash_palette(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+    fn update_tg_flash_rainbow(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
         todo!()
     }
 }
@@ -529,9 +536,9 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
 /// This background parameter struct can be used to turn off all background effects
 pub const BG_OFF: AnimationBackgroundParameters<1> = AnimationBackgroundParameters {
     mode: BackgroundMode::NoBackground,
-    palette: c::P_OFF,
+    rainbow: c::R_OFF,
     direction: Direction::Stopped,
-    is_palette_reversed: false,
+    is_rainbow_reversed: false,
     duration_ns: 0,
     subdivisions: DEFAULT_NUMBER_OF_SUBDIVISIONS,
 };
@@ -539,9 +546,9 @@ pub const BG_OFF: AnimationBackgroundParameters<1> = AnimationBackgroundParamete
 /// This foreground parameter struct can be used to turn off all foreground effects
 pub const FG_OFF: AnimationForegroundParameters<1> = AnimationForegroundParameters {
     mode: ForegroundMode::NoForeground,
-    palette: c::P_OFF,
+    rainbow: c::R_OFF,
     direction: Direction::Stopped,
-    is_palette_reversed: false,
+    is_rainbow_reversed: false,
     duration_ns: 0,
     step_time_ns: 0,
     subdivisions: DEFAULT_NUMBER_OF_SUBDIVISIONS,
@@ -549,8 +556,8 @@ pub const FG_OFF: AnimationForegroundParameters<1> = AnimationForegroundParamete
 
 /// This global trigger parameter struct can be used to turn off all trigger effects.
 pub const TRIGGER_OFF: AnimationGlobalTriggerParameters<1> = AnimationGlobalTriggerParameters {
-    palette: c::P_OFF,
-    is_palette_reversed: false,
+    rainbow: c::R_OFF,
+    is_rainbow_reversed: false,
     duration_ns: 0,
 };
 
@@ -561,9 +568,9 @@ pub const ANI_ALL_OFF: AnimationParameters<1, 1, 1> =
 /// This is an animation background struct used for testing
 pub const BG_TEST: AnimationBackgroundParameters<3> = AnimationBackgroundParameters {
     mode: BackgroundMode::SolidFade,
-    palette: c::P_ROYGBIV,
+    rainbow: c::R_ROYGBIV,
     direction: Direction::Positive,
-    is_palette_reversed: false,
+    is_rainbow_reversed: false,
     duration_ns: 10_000_000_000,
     subdivisions: DEFAULT_NUMBER_OF_SUBDIVISIONS,
 };
@@ -571,9 +578,9 @@ pub const BG_TEST: AnimationBackgroundParameters<3> = AnimationBackgroundParamet
 /// This is an animation foreground struct used for testing
 pub const FG_TEST: AnimationForegroundParameters<1> = AnimationForegroundParameters {
     mode: ForegroundMode::NoForeground,
-    palette: c::P_OFF,
+    rainbow: c::R_OFF,
     direction: Direction::Stopped,
-    is_palette_reversed: false,
+    is_rainbow_reversed: false,
     duration_ns: 0,
     step_time_ns: 0,
     subdivisions: DEFAULT_NUMBER_OF_SUBDIVISIONS,
@@ -581,8 +588,8 @@ pub const FG_TEST: AnimationForegroundParameters<1> = AnimationForegroundParamet
 
 /// This is an animation trigger struct used for testing
 pub const TRIGGER_TEST: AnimationGlobalTriggerParameters<1> = AnimationGlobalTriggerParameters {
-    palette: c::P_OFF,
-    is_palette_reversed: false,
+    rainbow: c::R_OFF,
+    is_rainbow_reversed: false,
     duration_ns: 0,
 };
 

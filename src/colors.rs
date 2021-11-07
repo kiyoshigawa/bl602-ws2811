@@ -71,39 +71,39 @@ pub const C_T_3500K: Color = Color { r: 255, g: 196, b: 137 };
 pub const C_T_4000K: Color = Color { r: 255, g: 209, b: 163 };
 pub const C_T_5000K: Color = Color { r: 255, g: 228, b: 206 };
 
-// Use const generic palettes to make iterable palettes of various sizes. Palettes contain a
-// list of colors in order, which will be used by animations as a color palette.
+// Use const generic rainbows to make iterable rainbows of various sizes. Rainbows contain a
+// list of colors in order, which will be used by animations as a color rainbow.
 #[derive(Copy, Clone)]
-pub struct Palette<const N: usize> {
+pub struct Rainbow<const N: usize> {
     pub colors: [Color; N],
 }
 
-pub const P_OFF: Palette<1> = Palette { colors: [C_OFF] };
-pub const P_ON: Palette<1> = Palette { colors: [C_WHITE] };
-pub const P_RED: Palette<1> = Palette { colors: [C_RED] };
-pub const P_ORANGE: Palette<1> = Palette { colors: [C_ORANGE] };
-pub const P_YELLOW: Palette<1> = Palette { colors: [C_YELLOW] };
-pub const P_YELLOW_GREEN: Palette<1> = Palette { colors: [C_YELLOW_GREEN] };
-pub const P_GREEN: Palette<1> = Palette { colors: [C_GREEN] };
-pub const P_GREEN_BLUE: Palette<1> = Palette { colors: [C_GREEN_BLUE] };
-pub const P_SKY_BLUE: Palette<1> = Palette { colors: [C_SKY_BLUE] };
-pub const P_DEEP_BLUE: Palette<1> = Palette { colors: [C_DEEP_BLUE] };
-pub const P_BLUE: Palette<1> = Palette { colors: [C_BLUE] };
-pub const P_BLUE_PURPLE: Palette<1> = Palette { colors: [C_BLUE_PURPLE] };
-pub const P_PURPLE: Palette<1> = Palette { colors: [C_PURPLE] };
-pub const P_DARK_PURPLE: Palette<1> = Palette { colors: [C_DARK_PURPLE] };
-pub const P_ROYGBIV: Palette<3> = Palette { colors: [C_RED, C_GREEN, C_BLUE] };
-pub const P_RYB: Palette<6> = Palette { colors: [C_RED, C_OFF, C_YELLOW, C_OFF, C_BLUE, C_OFF] };
-pub const P_OGP: Palette<6> =
-    Palette { colors: [C_ORANGE, C_OFF, C_GREEN, C_OFF, C_PURPLE, C_OFF] };
-pub const P_RGB: Palette<6> = Palette { colors: [C_RED, C_OFF, C_GREEN, C_OFF, C_BLUE, C_OFF] };
-pub const P_BY: Palette<4> = Palette { colors: [C_BLUE, C_OFF, C_YELLOW, C_OFF] };
-pub const P_RB: Palette<4> = Palette { colors: [C_RED, C_OFF, C_SKY_BLUE, C_OFF] };
-pub const P_OB: Palette<4> = Palette { colors: [C_ORANGE, C_OFF, C_DEEP_BLUE, C_OFF] };
-pub const P_BW: Palette<4> = Palette { colors: [C_BLUE, C_OFF, C_WHITE, C_OFF] };
-pub const P_RW: Palette<4> = Palette { colors: [C_RED, C_OFF, C_WHITE, C_OFF] };
-pub const P_GW: Palette<4> = Palette { colors: [C_GREEN, C_OFF, C_WHITE, C_OFF] };
-pub const P_DARK_RED_PATTERN: Palette<6> = Palette {
+pub const R_OFF: Rainbow<1> = Rainbow { colors: [C_OFF] };
+pub const R_ON: Rainbow<1> = Rainbow { colors: [C_WHITE] };
+pub const R_RED: Rainbow<1> = Rainbow { colors: [C_RED] };
+pub const R_ORANGE: Rainbow<1> = Rainbow { colors: [C_ORANGE] };
+pub const R_YELLOW: Rainbow<1> = Rainbow { colors: [C_YELLOW] };
+pub const R_YELLOW_GREEN: Rainbow<1> = Rainbow { colors: [C_YELLOW_GREEN] };
+pub const R_GREEN: Rainbow<1> = Rainbow { colors: [C_GREEN] };
+pub const R_GREEN_BLUE: Rainbow<1> = Rainbow { colors: [C_GREEN_BLUE] };
+pub const R_SKY_BLUE: Rainbow<1> = Rainbow { colors: [C_SKY_BLUE] };
+pub const R_DEEP_BLUE: Rainbow<1> = Rainbow { colors: [C_DEEP_BLUE] };
+pub const R_BLUE: Rainbow<1> = Rainbow { colors: [C_BLUE] };
+pub const R_BLUE_PURPLE: Rainbow<1> = Rainbow { colors: [C_BLUE_PURPLE] };
+pub const R_PURPLE: Rainbow<1> = Rainbow { colors: [C_PURPLE] };
+pub const R_DARK_PURPLE: Rainbow<1> = Rainbow { colors: [C_DARK_PURPLE] };
+pub const R_ROYGBIV: Rainbow<3> = Rainbow { colors: [C_RED, C_GREEN, C_BLUE] };
+pub const R_RYB: Rainbow<6> = Rainbow { colors: [C_RED, C_OFF, C_YELLOW, C_OFF, C_BLUE, C_OFF] };
+pub const R_OGP: Rainbow<6> =
+    Rainbow { colors: [C_ORANGE, C_OFF, C_GREEN, C_OFF, C_PURPLE, C_OFF] };
+pub const R_RGB: Rainbow<6> = Rainbow { colors: [C_RED, C_OFF, C_GREEN, C_OFF, C_BLUE, C_OFF] };
+pub const R_BY: Rainbow<4> = Rainbow { colors: [C_BLUE, C_OFF, C_YELLOW, C_OFF] };
+pub const R_RB: Rainbow<4> = Rainbow { colors: [C_RED, C_OFF, C_SKY_BLUE, C_OFF] };
+pub const R_OB: Rainbow<4> = Rainbow { colors: [C_ORANGE, C_OFF, C_DEEP_BLUE, C_OFF] };
+pub const R_BW: Rainbow<4> = Rainbow { colors: [C_BLUE, C_OFF, C_WHITE, C_OFF] };
+pub const R_RW: Rainbow<4> = Rainbow { colors: [C_RED, C_OFF, C_WHITE, C_OFF] };
+pub const R_GW: Rainbow<4> = Rainbow { colors: [C_GREEN, C_OFF, C_WHITE, C_OFF] };
+pub const R_DARK_RED_PATTERN: Rainbow<6> = Rainbow {
     colors: [
         Color { r: 127, g: 0, b: 0 },
         Color { r: 64, g: 0, b: 0 },
@@ -113,7 +113,7 @@ pub const P_DARK_RED_PATTERN: Palette<6> = Palette {
         Color { r: 64, g: 0, b: 0 },
     ],
 };
-pub const P_DARK_YELLOW_PATTERN: Palette<6> = Palette {
+pub const R_DARK_YELLOW_PATTERN: Rainbow<6> = Rainbow {
     colors: [
         Color { r: 127, g: 127, b: 0 },
         Color { r: 64, g: 64, b: 0 },
@@ -123,7 +123,7 @@ pub const P_DARK_YELLOW_PATTERN: Palette<6> = Palette {
         Color { r: 64, g: 64, b: 0 },
     ],
 };
-pub const P_DARK_GREEN_PATTERN: Palette<6> = Palette {
+pub const R_DARK_GREEN_PATTERN: Rainbow<6> = Rainbow {
     colors: [
         Color { r: 0, g: 127, b: 0 },
         Color { r: 0, g: 64, b: 0 },
@@ -133,7 +133,7 @@ pub const P_DARK_GREEN_PATTERN: Palette<6> = Palette {
         Color { r: 0, g: 64, b: 0 },
     ],
 };
-pub const P_DARK_SKY_BLUE_PATTERN: Palette<6> = Palette {
+pub const R_DARK_SKY_BLUE_PATTERN: Rainbow<6> = Rainbow {
     colors: [
         Color { r: 0, g: 127, b: 127 },
         Color { r: 0, g: 64, b: 64 },
@@ -143,7 +143,7 @@ pub const P_DARK_SKY_BLUE_PATTERN: Palette<6> = Palette {
         Color { r: 0, g: 64, b: 64 },
     ],
 };
-pub const P_DARK_BLUE_PATTERN: Palette<6> = Palette {
+pub const R_DARK_BLUE_PATTERN: Rainbow<6> = Rainbow {
     colors: [
         Color { r: 0, g: 0, b: 127 },
         Color { r: 0, g: 0, b: 64 },
@@ -153,7 +153,7 @@ pub const P_DARK_BLUE_PATTERN: Palette<6> = Palette {
         Color { r: 0, g: 0, b: 64 },
     ],
 };
-pub const P_DARK_PURPLE_PATTERN: Palette<6> = Palette {
+pub const R_DARK_PURPLE_PATTERN: Rainbow<6> = Rainbow {
     colors: [
         Color { r: 127, g: 0, b: 127 },
         Color { r: 64, g: 0, b: 64 },
@@ -163,7 +163,7 @@ pub const P_DARK_PURPLE_PATTERN: Palette<6> = Palette {
         Color { r: 64, g: 0, b: 64 },
     ],
 };
-pub const P_WHITE_PATTERN: Palette<6> = Palette {
+pub const R_WHITE_PATTERN: Rainbow<6> = Rainbow {
     colors: [
         Color { r: 127, g: 127, b: 127 },
         Color { r: 64, g: 64, b: 64 },
@@ -173,47 +173,47 @@ pub const P_WHITE_PATTERN: Palette<6> = Palette {
         Color { r: 64, g: 64, b: 64 },
     ],
 };
-pub const P_VU_METER: Palette<10> = Palette {
+pub const R_VU_METER: Rainbow<10> = Rainbow {
     colors: [
         C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_YELLOW, C_YELLOW, C_RED,
     ],
 };
 
-pub const NUM_PALETTES: usize = 31;
+pub const NUM_RAINBOWS: usize = 31;
 
-/// This is an array of the palette consts above that can be used to cycle through palettes in animations.
-pub const PALETTE_ARRAY: [&[Color]; NUM_PALETTES] = [
-    &P_OFF.colors,
-    &P_ON.colors,
-    &P_RED.colors,
-    &P_ORANGE.colors,
-    &P_YELLOW.colors,
-    &P_YELLOW_GREEN.colors,
-    &P_GREEN.colors,
-    &P_GREEN_BLUE.colors,
-    &P_SKY_BLUE.colors,
-    &P_DEEP_BLUE.colors,
-    &P_BLUE.colors,
-    &P_BLUE_PURPLE.colors,
-    &P_PURPLE.colors,
-    &P_DARK_PURPLE.colors,
-    &P_ROYGBIV.colors,
-    &P_RYB.colors,
-    &P_OGP.colors,
-    &P_RGB.colors,
-    &P_BY.colors,
-    &P_RB.colors,
-    &P_OB.colors,
-    &P_BW.colors,
-    &P_RW.colors,
-    &P_GW.colors,
-    &P_DARK_RED_PATTERN.colors,
-    &P_DARK_YELLOW_PATTERN.colors,
-    &P_DARK_GREEN_PATTERN.colors,
-    &P_DARK_SKY_BLUE_PATTERN.colors,
-    &P_DARK_BLUE_PATTERN.colors,
-    &P_DARK_PURPLE_PATTERN.colors,
-    &P_WHITE_PATTERN.colors,
+/// This is an array of the rainbow consts above that can be used to cycle through rainbows in animations.
+pub const RAINBOW_ARRAY: [&[Color]; NUM_RAINBOWS] = [
+    &R_OFF.colors,
+    &R_ON.colors,
+    &R_RED.colors,
+    &R_ORANGE.colors,
+    &R_YELLOW.colors,
+    &R_YELLOW_GREEN.colors,
+    &R_GREEN.colors,
+    &R_GREEN_BLUE.colors,
+    &R_SKY_BLUE.colors,
+    &R_DEEP_BLUE.colors,
+    &R_BLUE.colors,
+    &R_BLUE_PURPLE.colors,
+    &R_PURPLE.colors,
+    &R_DARK_PURPLE.colors,
+    &R_ROYGBIV.colors,
+    &R_RYB.colors,
+    &R_OGP.colors,
+    &R_RGB.colors,
+    &R_BY.colors,
+    &R_RB.colors,
+    &R_OB.colors,
+    &R_BW.colors,
+    &R_RW.colors,
+    &R_GW.colors,
+    &R_DARK_RED_PATTERN.colors,
+    &R_DARK_YELLOW_PATTERN.colors,
+    &R_DARK_GREEN_PATTERN.colors,
+    &R_DARK_SKY_BLUE_PATTERN.colors,
+    &R_DARK_BLUE_PATTERN.colors,
+    &R_DARK_PURPLE_PATTERN.colors,
+    &R_WHITE_PATTERN.colors,
 ];
 
 /// A color correction table for LEDs to make them look like the color you expect:

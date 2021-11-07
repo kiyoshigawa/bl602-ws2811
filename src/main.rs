@@ -3,11 +3,13 @@
 
 pub mod animations;
 pub mod colors;
+pub mod default_animations;
 pub mod hardware;
 pub mod leds;
 pub mod lighting_controller;
 
 use crate::animations as a;
+use crate::default_animations as da;
 use crate::leds::ws28xx as strip;
 use crate::lighting_controller as lc;
 
@@ -146,7 +148,7 @@ fn main() -> ! {
     }
 
     // Make a single animation operating on the whole strip:
-    let a = a::Animation::new(a::ANI_TEST, translation_array);
+    let a = a::Animation::new(da::ANI_TEST, translation_array);
     let animation_array = [a];
 
     let mut lc =

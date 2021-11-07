@@ -1,3 +1,5 @@
+const IS_GAMMA_CORRECTION_ENABLED: bool = false;
+
 #[allow(dead_code)]
 #[derive(Default, Copy, Clone)]
 pub struct Color {
@@ -17,9 +19,15 @@ impl Color {
 
     // change RGB color values for mutable color
     pub fn set_rgb(&mut self, r: u8, g: u8, b: u8) {
-        self.r = GAMMA8[r as usize];
-        self.g = GAMMA8[g as usize];
-        self.b = GAMMA8[b as usize];
+        if IS_GAMMA_CORRECTION_ENABLED {
+            self.r = GAMMA8[r as usize];
+            self.g = GAMMA8[g as usize];
+            self.b = GAMMA8[b as usize];
+        } else {
+            self.r = r;
+            self.g = g;
+            self.b = b;
+        }
     }
 
     // change RGB color values for mutable color

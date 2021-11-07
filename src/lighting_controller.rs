@@ -1,4 +1,5 @@
 use crate::animations as a;
+use crate::animations::AnimationType;
 use crate::hardware::{HardwareController, PeriodicTimer};
 use crate::leds::ws28xx::LogicalStrip;
 use embedded_time::duration::Nanoseconds;
@@ -53,10 +54,6 @@ where
         lc
     }
 
-    pub fn trigger(&mut self, animation_index: usize, params: &a::AnimationTriggerParameters) {
-        self.animations[animation_index].trigger(params);
-    }
-
     pub fn update<TimerHc>(&mut self, hc: &mut HardwareController<TimerHc>)
     where
         TimerHc: PeriodicTimer,
@@ -68,5 +65,13 @@ where
             }
             self.logical_strip.send_all_sequential(hc);
         }
+    }
+
+    pub fn trigger(&mut self, animation_index: usize, params: &a::AnimationTriggerParameters) {
+        self.animations[animation_index].trigger(params);
+    }
+
+    pub fn set_bg_offset(&mut self, animation_index: usize, a_type: AnimationType, offset: u16) {
+        self.animations[animation_index].set_offset(a_type, offset);
     }
 }

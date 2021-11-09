@@ -16,7 +16,7 @@ use crate::lighting_controller as lc;
 use crate::hardware::{DynamicPin, HardwareController};
 use bl602_hal as hal;
 use core::fmt::Write;
-use embedded_hal::delay::blocking::DelayMs;
+// use embedded_hal::delay::blocking::DelayMs;
 use embedded_time::rate::*;
 use hal::{
     clock::{Strict, SysclkFreq, UART_PLL_FREQ},
@@ -155,7 +155,7 @@ fn main() -> ! {
         lc::LightingController::new(office_strip, animation_array, 60_u32.Hz(), &mut timer_ch1);
 
     // get a millisecond delay for use with test patterns:
-    let mut d = bl602_hal::delay::McycleDelay::new(clocks.sysclk().0);
+    // let mut d = bl602_hal::delay::McycleDelay::new(clocks.sysclk().0);
 
     let test_trigger = a::AnimationTriggerParameters {
         mode: a::TriggerMode::Background,

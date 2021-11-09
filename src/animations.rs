@@ -548,7 +548,12 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         }
     }
 
-    fn fill_bg_rainbow(&mut self, start_offset: u16, logical_strip: &mut LogicalStrip<N_LED>) {
+    fn fill_rainbow<const N_R: usize>(
+        &mut self,
+        start_offset: u16,
+        rainbow: c::Rainbow<N_R>,
+        logical_strip: &mut LogicalStrip<N_LED>,
+    ) {
         self.increment_bg_frames();
         // Always start with the first color of the rainbow:
         self.bg_state.current_rainbow_color_index = 0;
@@ -557,9 +562,9 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         // to take into account that the rainbow will be repeated by the number of subdivisions in
         // the bg parameters:
         let distance_between_colors =
-            MAX_OFFSET as u32 / (N_BG as u32 * (self.parameters.bg.subdivisions + 1) as u32);
+            MAX_OFFSET as u32 / (N_R as u32 * (self.parameters.bg.subdivisions + 1) as u32);
         let mut num_leds_set = 0;
-        let total_num_rainbow_colors = N_BG * (self.parameters.bg.subdivisions + 1);
+        let total_num_rainbow_colors = N_R * (self.parameters.bg.subdivisions + 1);
         let mut all_leds_are_set = false;
         for color_index in 0..total_num_rainbow_colors {
             // initialize for the section between two colors:
@@ -662,7 +667,7 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
 
     fn update_bg_fill_rainbow(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
         // This mode only fills the rainbow to whatever value the offset is currently set to:
-        self.fill_bg_rainbow(self.bg_state.offset, logical_strip);
+        self.fill_rainbow(self.bg_state.offset, self.parameters.bg.rainbow, logical_strip);
     }
 
     fn update_bg_fill_rainbow_rotate(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
@@ -678,7 +683,7 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         } else {
             self.bg_state.offset
         };
-        self.fill_bg_rainbow(color_start_offset, logical_strip);
+        self.fill_rainbow(color_start_offset, self.parameters.bg.rainbow, logical_strip);
     }
 
     // Foregrounds:

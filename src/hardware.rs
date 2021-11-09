@@ -6,19 +6,13 @@ use embedded_time::duration::*;
 
 pub type DynamicPin<'a> = &'a mut dyn OutputPin<Error = Infallible>;
 
-pub struct HardwareController<'a, T>
-where
-    T: PeriodicTimer,
-{
+pub struct HardwareController<'a> {
     pins: [DynamicPin<'a>; NUM_STRIPS],
-    timer: T,
+    pub(crate) timer: ConfiguredTimerChannel0,
 }
 
-impl<'a, T> HardwareController<'a, T>
-where
-    T: PeriodicTimer,
-{
-    pub fn new(pins: [DynamicPin<'a>; NUM_STRIPS], timer: T) -> Self {
+impl<'a> HardwareController<'a> {
+    pub fn new(pins: [DynamicPin<'a>; NUM_STRIPS], timer: ConfiguredTimerChannel0) -> Self {
         HardwareController { pins, timer }
     }
 
@@ -64,6 +58,8 @@ macro_rules! setup_periodic_timer {
             fn periodic_wait(&mut self) {
                 loop {
                     if self.is_match2() {
+                        self.clear_match0_interrupt();
+                        self.clear_match1_interrupt();
                         self.clear_match2_interrupt();
                         break;
                     }

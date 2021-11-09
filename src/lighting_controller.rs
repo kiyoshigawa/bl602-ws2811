@@ -54,10 +54,7 @@ where
         lc
     }
 
-    pub fn update<TimerHc>(&mut self, hc: &mut HardwareController<TimerHc>)
-    where
-        TimerHc: PeriodicTimer,
-    {
+    pub fn update(&mut self, hc: &mut HardwareController) {
         // Only update if it's been longer than the frame rate period since the last update:
         if self.timer.periodic_check_timeout().is_ok() {
             for animation in self.animations.iter_mut() {

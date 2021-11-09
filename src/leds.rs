@@ -52,42 +52,34 @@ pub mod ws28xx {
     }
 
     impl PhysicalStrip {
-        pub fn send_bits<'b, T>(
+        pub fn send_bits<'a>(
             &self,
-            hc: &mut HardwareController<T>,
+            hc: &mut HardwareController,
             pin_index: usize,
-            bit_buffer: impl IntoIterator<Item = &'b bool>,
-        ) where
-            T: PeriodicTimer,
-        {
-            // restart the timer every time to make sure it's configured correctly and nobody has
-            // changed its interrupt timing settings:
-            hc.periodic_start((self.strip_timings.full_cycle / 3).nanoseconds());
+            bit_buffer: impl IntoIterator<Item = &'a bool>,
+        ) {
+            hc.timer.set_match0(self.strip_timings.zero_h.nanoseconds());
+            hc.timer.enable_match0_interrupt();
+            hc.timer.set_match1(self.strip_timings.one_h.nanoseconds());
+            hc.timer.enable_match1_interrupt();
+
+            hc.periodic_start(self.strip_timings.full_cycle.nanoseconds());
+
             // keep the data pin low long enough for the leds to reset
             hc.set_low(pin_index);
             for _ in 0..WS2811_DELAY_LOOPS_BEFORE_SEND {
                 hc.periodic_wait();
             }
+
             // iterate over the bits and send them to the pin with appropriate timing
             for bit in bit_buffer {
+                hc.periodic_wait();
+                hc.set_high(pin_index);
                 match bit {
-                    true => {
-                        // on for 2/3 of the total time:
-                        hc.set_high(pin_index);
-                        hc.periodic_wait();
-                        hc.periodic_wait();
-                        hc.set_low(pin_index);
-                        hc.periodic_wait();
-                    }
-                    false => {
-                        // on for 1/3 of the total time:
-                        hc.set_high(pin_index);
-                        hc.periodic_wait();
-                        hc.set_low(pin_index);
-                        hc.periodic_wait();
-                        hc.periodic_wait();
-                    }
+                    true => while !hc.timer.is_match1() {},
+                    false => while !hc.timer.is_match0() {},
                 }
+                hc.set_low(pin_index);
             }
         }
     }
@@ -115,10 +107,7 @@ pub mod ws28xx {
         }
 
         // this will iterate over all the strips and send the led data in series:
-        pub fn send_all_sequential<T>(&self, hc: &mut HardwareController<T>)
-        where
-            T: PeriodicTimer,
-        {
+        pub fn send_all_sequential(&self, hc: &mut HardwareController) {
             let mut start_index = 0;
 
             for (pin_index, strip) in self.strips.iter().enumerate() {

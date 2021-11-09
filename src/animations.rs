@@ -2,6 +2,9 @@ use crate::colors as c;
 use crate::colors::Color;
 use crate::leds::ws28xx::LogicalStrip;
 use embedded_time::rate::*;
+use rand::rngs::SmallRng;
+use rand::RngCore;
+use rand::{Rng, SeedableRng};
 
 /// This value is used as a default value for the number of subdivisions on the const animations at
 /// the end of the file. Typically this number should be 0 for shorter strips, and higher as you add
@@ -255,6 +258,7 @@ pub struct Animation<const N_BG: usize, const N_FG: usize, const N_TG: usize, co
     bg_state: AnimationState,
     trigger_state: AnimationGlobalTriggerState,
     active_triggers: [AnimationTriggerState; MAX_NUM_ACTIVE_TRIGGERS],
+    random_number_generator: SmallRng,
 }
 
 impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize>
@@ -263,6 +267,7 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
     pub fn new(
         parameters: AnimationParameters<N_BG, N_FG, N_TG>,
         translation_array: [usize; N_LED],
+        random_seed: u64,
     ) -> Self {
         // Generate the LED Position Array. This is constant for every Animation based on the
         // number of LEDs <N_LED> in the animation. The LED positions are distributed evenly over
@@ -275,6 +280,7 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
             *led = current_led_offset;
             current_led_offset += single_led_offset;
         }
+        let random_number_generator = SmallRng::seed_from_u64(random_seed);
         Animation {
             parameters,
             translation_array,
@@ -283,6 +289,7 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
             bg_state: AnimationState::default(),
             trigger_state: AnimationGlobalTriggerState::default(),
             active_triggers: [DEFAULT_TRIGGER; MAX_NUM_ACTIVE_TRIGGERS],
+            random_number_generator,
         }
     }
 
@@ -666,11 +673,21 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
     }
 
     fn update_bg_fill_rainbow(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        // handle trigger condition:
+        if self.bg_state.has_been_triggered {
+            self.bg_state.offset =
+                (self.random_number_generator.next_u32() % MAX_OFFSET as u32) as u16;
+        }
         // This mode only fills the rainbow to whatever value the offset is currently set to:
         self.fill_rainbow(self.bg_state.offset, self.parameters.bg.rainbow, logical_strip);
     }
 
     fn update_bg_fill_rainbow_rotate(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        // handle trigger condition:
+        if self.bg_state.has_been_triggered {
+            self.bg_state.offset =
+                (self.random_number_generator.next_u32() % MAX_OFFSET as u32) as u16;
+        }
         // This mode will take the value that the offset is set to and then adjust based on the
         // current frame / total frames ratio to decide where to begin the rainbow. Need to do the
         // addition of the set offset plus the frame offset as u32s to avoid going over u16::MAX,

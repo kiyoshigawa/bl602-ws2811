@@ -148,7 +148,7 @@ fn main() -> ! {
     }
 
     // Make a single animation operating on the whole strip:
-    let a = a::Animation::new(da::ANI_TEST, translation_array);
+    let a = a::Animation::new(da::ANI_TEST, translation_array, 2173481723);
     let animation_array = [a];
 
     let mut lc =

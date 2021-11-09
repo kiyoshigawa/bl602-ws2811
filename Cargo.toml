@@ -14,6 +14,7 @@ riscv = "0.7.0"
 embedded-time = "0.12.0"
 nb = "1.0.0"
 bitvec = { version = "0.22.3", default-features = false }
+rand = { version = "0.8.4", features = ["small_rng"], default-features = false }
 
 # You probably don't want to use a debug build, but lots of people accidentally do
 # give the code at least a low level of optimization

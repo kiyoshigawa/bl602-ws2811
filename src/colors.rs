@@ -100,7 +100,7 @@ pub const R_BLUE: Rainbow<1> = Rainbow { colors: [C_BLUE] };
 pub const R_BLUE_PURPLE: Rainbow<1> = Rainbow { colors: [C_BLUE_PURPLE] };
 pub const R_PURPLE: Rainbow<1> = Rainbow { colors: [C_PURPLE] };
 pub const R_DARK_PURPLE: Rainbow<1> = Rainbow { colors: [C_DARK_PURPLE] };
-pub const R_ROYGBIV: Rainbow<3> = Rainbow { colors: [C_RED, C_GREEN, C_BLUE] };
+pub const R_ROYGBIV: Rainbow<4> = Rainbow { colors: [C_RED, C_YELLOW, C_GREEN, C_BLUE] };
 pub const R_RYB: Rainbow<6> = Rainbow { colors: [C_RED, C_OFF, C_YELLOW, C_OFF, C_BLUE, C_OFF] };
 pub const R_OGP: Rainbow<6> =
     Rainbow { colors: [C_ORANGE, C_OFF, C_GREEN, C_OFF, C_PURPLE, C_OFF] };

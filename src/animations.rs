@@ -3,13 +3,7 @@ use crate::colors::Color;
 use crate::leds::ws28xx::LogicalStrip;
 use embedded_time::rate::*;
 use rand::rngs::SmallRng;
-use rand::RngCore;
-use rand::{Rng, SeedableRng};
-
-/// This value is used as a default value for the number of subdivisions on the const animations at
-/// the end of the file. Typically this number should be 0 for shorter strips, and higher as you add
-/// more LEDs. It controls how often the rainbow colors repeat over the entire length of LEDs.
-pub const DEFAULT_NUMBER_OF_SUBDIVISIONS: usize = 0;
+use rand::{RngCore, SeedableRng};
 
 /// Adjust MAX_NUM_* consts depending on RAM requirements:
 const MAX_NUM_ACTIVE_TRIGGERS: usize = 10;
@@ -561,7 +555,6 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         rainbow: c::Rainbow<N_R>,
         logical_strip: &mut LogicalStrip<N_LED>,
     ) {
-        self.increment_bg_frames();
         // Always start with the first color of the rainbow:
         self.bg_state.current_rainbow_color_index = 0;
 
@@ -580,9 +573,7 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
             // Positions can be larger than MAX_OFFSET so that the interpolation is easier on a per-LED basis.
             let current_color_position =
                 start_offset as u32 + (color_index as u32 * distance_between_colors);
-            let next_color_position = start_offset as u32
-                + (color_index as u32 * distance_between_colors)
-                + distance_between_colors as u32;
+            let next_color_position = current_color_position + distance_between_colors as u32;
             let mut mid_color: Color;
 
             // Iterate over all the LEDs twice and work only on the ones with a position between
@@ -677,16 +668,19 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         if self.bg_state.has_been_triggered {
             self.bg_state.offset =
                 (self.random_number_generator.next_u32() % MAX_OFFSET as u32) as u16;
+            self.bg_state.has_been_triggered = false;
         }
         // This mode only fills the rainbow to whatever value the offset is currently set to:
         self.fill_rainbow(self.bg_state.offset, self.parameters.bg.rainbow, logical_strip);
     }
 
     fn update_bg_fill_rainbow_rotate(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+        self.increment_bg_frames();
         // handle trigger condition:
         if self.bg_state.has_been_triggered {
             self.bg_state.offset =
                 (self.random_number_generator.next_u32() % MAX_OFFSET as u32) as u16;
+            self.bg_state.has_been_triggered = false;
         }
         // This mode will take the value that the offset is set to and then adjust based on the
         // current frame / total frames ratio to decide where to begin the rainbow. Need to do the

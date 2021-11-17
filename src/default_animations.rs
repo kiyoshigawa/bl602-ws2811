@@ -1,6 +1,11 @@
 use crate::animations::*;
 use crate::colors as c;
 
+/// This value is used as a default value for the number of subdivisions on the const animations at
+/// the end of the file. Typically this number should be 0 for shorter strips, and higher as you add
+/// more LEDs. It controls how often the rainbow colors repeat over the entire length of LEDs.
+pub const DEFAULT_NUMBER_OF_SUBDIVISIONS: usize = 0;
+
 // Below here are some pre-configured const AnimationParameters variables that can be references and used
 // in animations. They're also good examples of the kinds of things you can do with animations.
 
@@ -37,7 +42,7 @@ pub const ANI_ALL_OFF: AnimationParameters<1, 1, 1> =
     AnimationParameters { bg: BG_OFF, fg: FG_OFF, trigger: TRIGGER_OFF };
 
 /// This is an animation background struct used for testing
-pub const BG_TEST: AnimationBackgroundParameters<3> = AnimationBackgroundParameters {
+pub const BG_TEST: AnimationBackgroundParameters<4> = AnimationBackgroundParameters {
     mode: BackgroundMode::FillRainbowRotate,
     rainbow: c::R_ROYGBIV,
     direction: Direction::Positive,
@@ -65,5 +70,5 @@ pub const TRIGGER_TEST: AnimationGlobalTriggerParameters<1> = AnimationGlobalTri
 };
 
 /// This animation parameter struct will turn off ALL animations: fg, bg, and trigger.
-pub const ANI_TEST: AnimationParameters<3, 1, 1> =
+pub const ANI_TEST: AnimationParameters<4, 1, 1> =
     AnimationParameters { bg: BG_TEST, fg: FG_TEST, trigger: TRIGGER_TEST };

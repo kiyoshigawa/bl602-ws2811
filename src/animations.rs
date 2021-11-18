@@ -682,18 +682,19 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
                 (self.random_number_generator.next_u32() % MAX_OFFSET as u32) as u16;
             self.bg_state.has_been_triggered = false;
         }
+
         // This mode will take the value that the offset is set to and then adjust based on the
         // current frame / total frames ratio to decide where to begin the rainbow. Need to do the
         // addition of the set offset plus the frame offset as u32s to avoid going over u16::MAX,
         // then modulo back to a u16 value using MAX_OFFSET when done.
-        let color_start_offset = if self.bg_state.total_frames != 0 {
-            (self.bg_state.offset as u32
-                + (self.bg_state.current_frame * MAX_OFFSET as u32 / self.bg_state.total_frames))
-                as u16
-                % MAX_OFFSET
-        } else {
-            self.bg_state.offset
-        };
+        let mut color_start_offset = self.bg_state.offset;
+
+        if self.bg_state.total_frames != 0 {
+            color_start_offset +=
+                (MAX_OFFSET as u32 * self.bg_state.current_frame / self.bg_state.total_frames) as u16;
+        }
+        color_start_offset %= MAX_OFFSET;
+
         self.fill_rainbow(color_start_offset, self.parameters.bg.rainbow, logical_strip);
     }
 

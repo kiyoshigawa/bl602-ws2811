@@ -43,19 +43,19 @@ const NUM_LEDS_CLOSET_STRIP: usize = 4;
 const CLOSET_STRIP: strip::PhysicalStrip = strip::PhysicalStrip {
     led_count: NUM_LEDS_CLOSET_STRIP,
     reversed: false,
-    color_order: strip::ColorOrder::BRG,
+    color_order: strip::ColorOrder::GRB,
     strip_timings: strip::StripTimings::WS2812_ADAFRUIT,
 };
 const WINDOW_STRIP: strip::PhysicalStrip = strip::PhysicalStrip {
     led_count: NUM_LEDS_WINDOW_STRIP,
     reversed: false,
-    color_order: strip::ColorOrder::BRG,
+    color_order: strip::ColorOrder::GRB,
     strip_timings: strip::StripTimings::WS2812_ADAFRUIT,
 };
 const DOOR_STRIP: strip::PhysicalStrip = strip::PhysicalStrip {
     led_count: NUM_LEDS_DOOR_STRIP,
     reversed: true,
-    color_order: strip::ColorOrder::BRG,
+    color_order: strip::ColorOrder::GRB,
     strip_timings: strip::StripTimings::WS2812_ADAFRUIT,
 };
 

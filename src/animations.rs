@@ -423,121 +423,95 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         }
     }
 
-    fn advance_bg_rainbow_index(&mut self) {
-        if N_BG != 0 {
-            self.bg_state.current_rainbow_color_index = if self.parameters.bg.is_rainbow_reversed {
-                self.get_decremented_bg_rainbow_index()
-            } else {
-                self.get_incremented_bg_rainbow_index()
+    // Rainbow Position Controls:
+
+    fn get_next_rainbow_index(&mut self, ani_type: AnimationType) -> usize {
+        match ani_type {
+            AnimationType::Background => {
+                let increment: i32 = match self.parameters.bg.is_rainbow_reversed {
+                    true => 1,
+                    false => -1,
+                };
+                (self.bg_state.current_rainbow_color_index as i32 + N_BG as i32 + increment)
+                    as usize
+                    % N_BG
             }
-        } else {
-            self.bg_state.current_rainbow_color_index = 0
-        }
-    }
-
-    fn get_incremented_bg_rainbow_index(&mut self) -> usize {
-        (self.bg_state.current_rainbow_color_index + 1) % N_BG
-    }
-
-    fn get_decremented_bg_rainbow_index(&mut self) -> usize {
-        // When the index is reversed, then we need to count from N_BG down to 0
-        if self.bg_state.current_rainbow_color_index != 0 {
-            // Any number larger than 0 can be decremented safely
-            self.bg_state.current_rainbow_color_index - 1
-        } else {
-            // When we go to the next color and we're at 0, we go back to N_BG-1
-            N_BG - 1
-        }
-    }
-
-    fn get_current_bg_rainbow_color(&mut self) -> Color {
-        self.parameters.bg.rainbow.colors[self.bg_state.current_rainbow_color_index]
-    }
-
-    fn get_next_bg_rainbow_color(&mut self) -> Color {
-        if self.parameters.bg.is_rainbow_reversed {
-            self.parameters.bg.rainbow.colors[self.get_decremented_bg_rainbow_index()]
-        } else {
-            self.parameters.bg.rainbow.colors[self.get_incremented_bg_rainbow_index()]
-        }
-    }
-
-    fn advance_fg_rainbow_index(&mut self) {
-        if N_FG != 0 {
-            self.fg_state.current_rainbow_color_index = if self.parameters.fg.is_rainbow_reversed {
-                self.get_decremented_fg_rainbow_index()
-            } else {
-                self.get_incremented_fg_rainbow_index()
+            AnimationType::Foreground => {
+                let increment: i32 = match self.parameters.fg.is_rainbow_reversed {
+                    true => 1,
+                    false => -1,
+                };
+                (self.fg_state.current_rainbow_color_index as i32 + N_BG as i32 + increment)
+                    as usize
+                    % N_FG
             }
-        } else {
-            self.fg_state.current_rainbow_color_index = 0
+            AnimationType::Trigger => {
+                let increment: i32 = match self.parameters.trigger.is_rainbow_reversed {
+                    true => 1,
+                    false => -1,
+                };
+                (self.trigger_state.current_rainbow_color_index as i32 + N_BG as i32 + increment)
+                    as usize
+                    % N_TG
+            }
         }
     }
 
-    fn get_incremented_fg_rainbow_index(&mut self) -> usize {
-        (self.fg_state.current_rainbow_color_index + 1) % N_FG
-    }
-
-    fn get_decremented_fg_rainbow_index(&mut self) -> usize {
-        // When the index is reversed, then we need to count from N_FG down to 0
-        if self.fg_state.current_rainbow_color_index != 0 {
-            // Any number larger than 0 can be decremented safely
-            self.fg_state.current_rainbow_color_index - 1
-        } else {
-            // When we go to the next color and we're at 0, we go back to N_FG-1
-            N_FG - 1
+    fn get_current_rainbow_color(&mut self, ani_type: AnimationType) -> Color {
+        match ani_type {
+            AnimationType::Background => {
+                self.parameters.bg.rainbow.colors[self.bg_state.current_rainbow_color_index]
+            }
+            AnimationType::Foreground => {
+                self.parameters.fg.rainbow.colors[self.fg_state.current_rainbow_color_index]
+            }
+            AnimationType::Trigger => {
+                self.parameters.trigger.rainbow.colors
+                    [self.trigger_state.current_rainbow_color_index]
+            }
         }
     }
 
-    fn get_current_fg_rainbow_color(&mut self) -> Color {
-        self.parameters.fg.rainbow.colors[self.fg_state.current_rainbow_color_index]
-    }
-
-    fn get_next_fg_rainbow_color(&mut self) -> Color {
-        if self.parameters.fg.is_rainbow_reversed {
-            self.parameters.fg.rainbow.colors[self.get_decremented_fg_rainbow_index()]
-        } else {
-            self.parameters.fg.rainbow.colors[self.get_incremented_fg_rainbow_index()]
+    fn get_next_rainbow_color(&mut self, ani_type: AnimationType) -> Color {
+        match ani_type {
+            AnimationType::Background => {
+                self.parameters.bg.rainbow.colors[self.get_next_rainbow_index(ani_type)]
+            }
+            AnimationType::Foreground => {
+                self.parameters.fg.rainbow.colors[self.get_next_rainbow_index(ani_type)]
+            }
+            AnimationType::Trigger => {
+                self.parameters.trigger.rainbow.colors[self.get_next_rainbow_index(ani_type)]
+            }
         }
     }
 
-    fn advance_trigger_rainbow_index(&mut self) {
-        if N_TG != 0 {
-            self.trigger_state.current_rainbow_color_index =
-                if self.parameters.trigger.is_rainbow_reversed {
-                    self.get_decremented_trigger_rainbow_index()
+    fn advance_rainbow_index(&mut self, ani_type: AnimationType) {
+        match ani_type {
+            AnimationType::Background => {
+                if N_BG != 0 {
+                    self.bg_state.current_rainbow_color_index =
+                        self.get_next_rainbow_index(ani_type);
                 } else {
-                    self.get_incremented_trigger_rainbow_index()
+                    self.bg_state.current_rainbow_color_index = 0;
                 }
-        } else {
-            self.trigger_state.current_rainbow_color_index = 0
-        }
-    }
-
-    fn get_incremented_trigger_rainbow_index(&mut self) -> usize {
-        (self.trigger_state.current_rainbow_color_index + 1) % N_TG
-    }
-
-    fn get_decremented_trigger_rainbow_index(&mut self) -> usize {
-        // When the index is reversed, then we need to count from N_TG down to 0
-        if self.trigger_state.current_rainbow_color_index != 0 {
-            // Any number larger than 0 can be decremented safely
-            self.trigger_state.current_rainbow_color_index - 1
-        } else {
-            // When we go to the next color and we're at 0, we go back to N_TG-1
-            N_TG - 1
-        }
-    }
-
-    fn get_current_trigger_rainbow_color(&mut self) -> Color {
-        self.parameters.trigger.rainbow.colors[self.trigger_state.current_rainbow_color_index]
-    }
-
-    fn get_next_trigger_rainbow_color(&mut self) -> Color {
-        if self.parameters.trigger.is_rainbow_reversed {
-            self.parameters.trigger.rainbow.colors[self.get_decremented_trigger_rainbow_index()]
-        } else {
-            self.parameters.trigger.rainbow.colors[self.get_incremented_trigger_rainbow_index()]
+            }
+            AnimationType::Foreground => {
+                if N_BG != 0 {
+                    self.fg_state.current_rainbow_color_index =
+                        self.get_next_rainbow_index(ani_type);
+                } else {
+                    self.fg_state.current_rainbow_color_index = 0;
+                }
+            }
+            AnimationType::Trigger => {
+                if N_BG != 0 {
+                    self.trigger_state.current_rainbow_color_index =
+                        self.get_next_rainbow_index(ani_type);
+                } else {
+                    self.trigger_state.current_rainbow_color_index = 0;
+                }
+            }
         }
     }
 
@@ -596,74 +570,6 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         }
     }
 
-    fn _fill_rainbow<const N_R: usize>(
-        &mut self,
-        start_offset: u16,
-        rainbow: c::Rainbow<N_R>,
-        logical_strip: &mut LogicalStrip<N_LED>,
-    ) {
-        // Always start with the first color of the rainbow:
-        self.bg_state.current_rainbow_color_index = 0;
-
-        // We will need to know the distance between each color of the rainbow, and this will need
-        // to take into account that the rainbow will be repeated by the number of subdivisions in
-        // the bg parameters:
-        let distance_between_colors =
-            MAX_OFFSET as u32 / (N_R as u32 * (self.parameters.bg.subdivisions + 1) as u32);
-        let mut num_leds_set = 0;
-        let total_num_rainbow_colors = N_R * (self.parameters.bg.subdivisions + 1);
-        let mut all_leds_are_set = false;
-        for color_index in 0..total_num_rainbow_colors {
-            // initialize for the section between two colors:
-            let current_color = self.get_current_bg_rainbow_color();
-            let next_color = self.get_next_bg_rainbow_color();
-            // Positions can be larger than MAX_OFFSET so that the interpolation is easier on a per-LED basis.
-            let current_color_position =
-                start_offset as u32 + (color_index as u32 * distance_between_colors);
-            let next_color_position = current_color_position + distance_between_colors as u32;
-            let mut mid_color: Color;
-
-            // Iterate over all the LEDs twice and work only on the ones with a position between
-            for led_index in 0..(N_LED * 2) {
-                // First get a 'corrected' LED position that takes the double length of the position
-                // array into account:
-                let corrected_led_offset = if led_index < N_LED {
-                    self.led_position_array[led_index] as u32
-                } else {
-                    self.led_position_array[led_index - N_LED] as u32 + MAX_OFFSET as u32
-                };
-                // only set LED values if the LED position falls between the current and next color:
-                if corrected_led_offset >= current_color_position
-                    && corrected_led_offset < next_color_position
-                {
-                    // Get the index of the LED in the LogicalStrip:
-                    let current_led_index = self.translation_array[led_index % N_LED];
-                    // Calculate the color at the LED using the position and color info:
-                    mid_color = c::Color::color_lerp(
-                        corrected_led_offset as i32,
-                        current_color_position as i32,
-                        next_color_position as i32,
-                        current_color,
-                        next_color,
-                    );
-                    // Set the LED color on the logical strip:
-                    logical_strip.set_color_at_index(current_led_index, mid_color);
-                    num_leds_set += 1;
-                    // Check to see if we've set all LEDS:
-                    if num_leds_set >= N_LED {
-                        // Stop iterating once all LEDs are set:
-                        all_leds_are_set = true;
-                        break;
-                    }
-                }
-            } // LED for loop
-            self.advance_bg_rainbow_index();
-            if all_leds_are_set {
-                break;
-            }
-        } // color for loop
-    }
-
     // Backgrounds:
 
     fn update_bg_no_background(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
@@ -674,7 +580,7 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
 
     fn update_bg_solid(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
         if self.bg_state.has_been_triggered {
-            self.advance_bg_rainbow_index();
+            self.advance_rainbow_index(AnimationType::Background);
             self.bg_state.has_been_triggered = false;
         }
         // Set all LEDs to the current rainbow color. Note that in this mode the color will only
@@ -686,7 +592,7 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
 
     fn update_bg_solid_fade(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
         if self.bg_state.has_been_triggered {
-            self.advance_bg_rainbow_index();
+            self.advance_rainbow_index(AnimationType::Background);
             self.bg_state.current_frame = 0;
             self.bg_state.has_been_triggered = false;
         }
@@ -694,10 +600,10 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         self.increment_bg_frames();
         // Check to see when the color rolls over:
         if self.bg_state.current_frame < previous_frame {
-            self.advance_bg_rainbow_index();
+            self.advance_rainbow_index(AnimationType::Background);
         }
-        let current_color = self.get_current_bg_rainbow_color();
-        let next_color = self.get_next_bg_rainbow_color();
+        let current_color = self.get_current_rainbow_color(AnimationType::Background);
+        let next_color = self.get_next_rainbow_color(AnimationType::Background);
         let intermediate_color = c::Color::color_lerp(
             self.bg_state.current_frame as i32,
             0,
@@ -737,8 +643,8 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         let mut color_start_offset = self.bg_state.offset;
 
         if self.bg_state.total_frames != 0 {
-            color_start_offset +=
-                (MAX_OFFSET as u32 * self.bg_state.current_frame / self.bg_state.total_frames) as u16;
+            color_start_offset += (MAX_OFFSET as u32 * self.bg_state.current_frame
+                / self.bg_state.total_frames) as u16;
         }
         color_start_offset %= MAX_OFFSET;
 

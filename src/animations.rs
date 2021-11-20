@@ -555,6 +555,53 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         rainbow: c::Rainbow<N_R>,
         logical_strip: &mut LogicalStrip<N_LED>,
     ) {
+        const MAX_OFFSET: usize = u16::MAX as usize;
+        let start_offset = start_offset as usize;
+        // Always start with the first color of the rainbow:
+        self.bg_state.current_rainbow_color_index = 0;
+
+        // We will need to know the distance between each color of the rainbow, and this will need
+        // to take into account that the rainbow will be repeated by the number of subdivisions in
+        // the bg parameters:
+        let total_num_rainbow_colors = N_R * self.parameters.bg.subdivisions.max(1);
+        let distance_between_colors = MAX_OFFSET / total_num_rainbow_colors;
+
+        for (led_index, &led_position) in self.led_position_array.iter().enumerate() {
+            // move the led position by offset rather than the rainbow itself
+            let shifted_position = (led_position as usize + MAX_OFFSET - start_offset) % MAX_OFFSET;
+
+            // all positions from one color to just before the next map to a rainbow bucket index
+            let rainbow_bucket = shifted_position / distance_between_colors;
+            let bucket_start = rainbow_bucket * distance_between_colors;
+
+            let factor = shifted_position - bucket_start;
+
+            let start_color_index = rainbow_bucket % N_R;
+            let start_color = rainbow.colors[start_color_index];
+
+            let end_color_index = (rainbow_bucket + 1) % N_R;
+            let end_color = rainbow.colors[end_color_index];
+
+            let mid_color = c::Color::color_lerp(
+                factor as i32,
+                0 as i32,
+                distance_between_colors as i32,
+                start_color,
+                end_color,
+            );
+
+            let translated_led_index = self.translation_array[led_index];
+
+            logical_strip.set_color_at_index(translated_led_index, mid_color);
+        }
+    }
+
+    fn _fill_rainbow<const N_R: usize>(
+        &mut self,
+        start_offset: u16,
+        rainbow: c::Rainbow<N_R>,
+        logical_strip: &mut LogicalStrip<N_LED>,
+    ) {
         // Always start with the first color of the rainbow:
         self.bg_state.current_rainbow_color_index = 0;
 

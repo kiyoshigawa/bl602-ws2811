@@ -166,9 +166,12 @@ fn main() -> ! {
         starting_offset: 0,
     };
 
+    // let mut i = 0_u16;
     loop {
         lc.update(&mut hc);
+        // i = (i + 1) % a::MAX_OFFSET;
+        // lc.set_offset(0, a::AnimationType::Foreground, i);
         // lc.trigger(0, &test_trigger);
-        // d.delay_ms(1000).ok();
+        // d.delay_ms(1).ok();
     }
 }

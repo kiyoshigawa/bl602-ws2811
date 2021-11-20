@@ -746,6 +746,13 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
             self.advance_rainbow_index(AnimationType::Foreground);
             self.fg_state.has_been_triggered = false;
         }
+
+        // calculate the marquee_position_toggle based on the set offset value:
+        let pip_distance =
+            (MAX_OFFSET as usize / N_LED) * self.parameters.fg.num_pixels_per_marquee_pip.max(1);
+        let led_bucket = self.fg_state.offset as usize / pip_distance.max(1);
+        self.fg_state.marquee_position_toggle = led_bucket % 2 == 0;
+
         let color = self.current_rainbow_color(AnimationType::Foreground);
         self.fill_marquee(color, logical_strip);
     }
@@ -767,6 +774,13 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
             self.fg_state.current_duration_frame = 0;
             self.fg_state.has_been_triggered = false;
         }
+
+        // calculate the marquee_position_toggle based on the set offset value:
+        let pip_distance =
+            (MAX_OFFSET as usize / N_LED) * self.parameters.fg.num_pixels_per_marquee_pip.max(1);
+        let led_bucket = self.fg_state.offset as usize / pip_distance.max(1);
+        self.fg_state.marquee_position_toggle = led_bucket % 2 == 0;
+
         let intermediate_color = self.calculate_fg_slow_fade_color();
         self.fill_marquee(intermediate_color, logical_strip);
     }

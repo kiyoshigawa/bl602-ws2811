@@ -69,7 +69,7 @@ where
         self.animations[animation_index].trigger(params);
     }
 
-    pub fn set_bg_offset(&mut self, animation_index: usize, a_type: AnimationType, offset: u16) {
+    pub fn set_offset(&mut self, animation_index: usize, a_type: AnimationType, offset: u16) {
         self.animations[animation_index].set_offset(a_type, offset);
     }
 }

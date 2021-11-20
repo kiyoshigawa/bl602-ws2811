@@ -177,6 +177,7 @@ pub struct AnimationForegroundParameters<const N: usize> {
     pub duration_ns: u64,
     pub step_time_ns: u64,
     pub subdivisions: usize,
+    pub num_pixels_per_marquee_pip: usize,
 }
 
 /// All triggers share a single rainbow / slow fade speed, which is configured in this struct
@@ -212,13 +213,6 @@ struct AnimationTriggerState {
     is_running: bool,
 }
 
-/// This contains the variables that apply to all triggers simultaneously, and not just to
-/// individual running triggers.
-#[derive(Default)]
-struct AnimationGlobalTriggerState {
-    current_rainbow_color_index: usize,
-}
-
 /// Used to initialize the array of trigger states to the default value.
 const DEFAULT_TRIGGER: AnimationTriggerState = AnimationTriggerState {
     mode: TriggerMode::NoTrigger,
@@ -234,10 +228,20 @@ const DEFAULT_TRIGGER: AnimationTriggerState = AnimationTriggerState {
 #[derive(Default)]
 struct AnimationState {
     offset: u16,
-    current_frame: u32,
-    total_frames: u32,
+    current_duration_frame: u32,
+    total_duration_frames: u32,
+    current_step_frame: u32,
+    total_step_frames: u32,
     current_rainbow_color_index: usize,
     has_been_triggered: bool,
+    marquee_position_toggle: bool,
+}
+
+/// This contains the variables that apply to all triggers simultaneously, and not just to
+/// individual running triggers.
+#[derive(Default)]
+struct AnimationGlobalTriggerState {
+    current_rainbow_color_index: usize,
 }
 
 /// This struct contains all the fixed parameters of an animation, as well as the state of the
@@ -287,11 +291,22 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         }
     }
 
-    pub fn init_total_frames(&mut self, framerate: impl Into<Hertz>) {
+    pub fn init_total_duration_frames(&mut self, framerate: impl Into<Hertz>) {
         let framerate = framerate.into();
-        self.bg_state.total_frames = (self.parameters.bg.duration_ns * framerate.integer() as u64
+        self.bg_state.total_duration_frames = (self.parameters.bg.duration_ns
+            * framerate.integer() as u64
             / 1_000_000_000_u64) as u32;
-        self.fg_state.total_frames = (self.parameters.fg.duration_ns * framerate.integer() as u64
+        self.fg_state.total_duration_frames = (self.parameters.fg.duration_ns
+            * framerate.integer() as u64
+            / 1_000_000_000_u64) as u32;
+    }
+
+    pub fn init_total_step_frames(&mut self, framerate: impl Into<Hertz>) {
+        let framerate = framerate.into();
+        // Background animations don't use steps, this can be set to 0 and ignored:
+        self.bg_state.total_step_frames = 0;
+        self.fg_state.total_step_frames = (self.parameters.fg.step_time_ns
+            * framerate.integer() as u64
             / 1_000_000_000_u64) as u32;
     }
 
@@ -299,7 +314,7 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         // Update BG:
         self.update_bg(logical_strip);
         // Update FG:
-        // self.update_fg(logical_strip);
+        self.update_fg(logical_strip);
         // Update Triggers:
         // self.update_triggers(logical_strip);
     }
@@ -384,8 +399,8 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         for trigger_index in 0..MAX_NUM_ACTIVE_TRIGGERS {
             match self.active_triggers[trigger_index].mode {
                 TriggerMode::NoTrigger => self.update_tg_no_trigger(logical_strip),
-                TriggerMode::Background => self.update_tg_background(logical_strip),
-                TriggerMode::Foreground => self.update_tg_foreground(logical_strip),
+                TriggerMode::Background => (), // This is handled in the update_bg() functions
+                TriggerMode::Foreground => (), // This is handled in the update_fg() functions
                 TriggerMode::ColorPulse => self.update_tg_color_pulse(logical_strip),
                 TriggerMode::ColorPulseSlowFade => {
                     self.update_tg_color_pulse_slow_fade(logical_strip)
@@ -405,27 +420,84 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
 
     // Incrementers:
 
-    fn increment_bg_frames(&mut self) {
-        if self.bg_state.total_frames != 0 {
-            self.bg_state.current_frame =
-                (self.bg_state.current_frame + 1) % self.bg_state.total_frames;
+    fn increment_bg_duration_frames(&mut self) {
+        if self.bg_state.total_duration_frames != 0 {
+            self.bg_state.current_duration_frame =
+                (self.bg_state.current_duration_frame + 1) % self.bg_state.total_duration_frames;
         } else {
-            self.bg_state.current_frame = 0
+            self.bg_state.current_duration_frame = 0
         }
     }
 
-    fn increment_fg_frames(&mut self) {
-        if self.fg_state.total_frames != 0 {
-            self.fg_state.current_frame =
-                (self.fg_state.current_frame + 1) % self.fg_state.total_frames;
+    fn increment_fg_duration_frames(&mut self) {
+        if self.fg_state.total_duration_frames != 0 {
+            self.fg_state.current_duration_frame =
+                (self.fg_state.current_duration_frame + 1) % self.fg_state.total_duration_frames;
         } else {
-            self.fg_state.current_frame = 0
+            self.fg_state.current_duration_frame = 0
         }
+    }
+
+    fn increment_fg_step_frames(&mut self) {
+        if self.fg_state.total_step_frames != 0 {
+            self.fg_state.current_step_frame =
+                (self.fg_state.current_step_frame + 1) % self.fg_state.total_step_frames;
+        } else {
+            self.fg_state.current_step_frame = 0
+        }
+    }
+
+    fn increment_marquee_step(&mut self) {
+        let previous_frame = self.fg_state.current_step_frame;
+        self.increment_fg_step_frames();
+        // Check to see when the color rolls over:
+        if self.fg_state.current_step_frame < previous_frame {
+            // toggle whether even or odd sub-pips are showing the marquee color:
+            self.fg_state.marquee_position_toggle = !self.fg_state.marquee_position_toggle;
+        }
+    }
+
+    // Slow Fade Intermediate Color Calculators:
+
+    fn calculate_bg_slow_fade_color(&mut self) -> Color {
+        let previous_frame = self.bg_state.current_duration_frame;
+        self.increment_fg_duration_frames();
+        // Check to see when the color rolls over:
+        if self.bg_state.current_duration_frame < previous_frame {
+            self.advance_rainbow_index(AnimationType::Background);
+        }
+        let current_color = self.current_rainbow_color(AnimationType::Background);
+        let next_color = self.next_rainbow_color(AnimationType::Background);
+        c::Color::color_lerp(
+            self.bg_state.current_duration_frame as i32,
+            0,
+            self.bg_state.total_duration_frames as i32,
+            current_color,
+            next_color,
+        )
+    }
+
+    fn calculate_fg_slow_fade_color(&mut self) -> Color {
+        let previous_frame = self.fg_state.current_duration_frame;
+        self.increment_fg_duration_frames();
+        // Check to see when the color rolls over:
+        if self.fg_state.current_duration_frame < previous_frame {
+            self.advance_rainbow_index(AnimationType::Foreground);
+        }
+        let current_color = self.current_rainbow_color(AnimationType::Foreground);
+        let next_color = self.next_rainbow_color(AnimationType::Foreground);
+        c::Color::color_lerp(
+            self.fg_state.current_duration_frame as i32,
+            0,
+            self.fg_state.total_duration_frames as i32,
+            current_color,
+            next_color,
+        )
     }
 
     // Rainbow Position Controls:
 
-    fn get_next_rainbow_index(&mut self, ani_type: AnimationType) -> usize {
+    fn next_rainbow_index(&mut self, ani_type: AnimationType) -> usize {
         match ani_type {
             AnimationType::Background => {
                 let increment: i32 = match self.parameters.bg.is_rainbow_reversed {
@@ -441,7 +513,7 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
                     true => 1,
                     false => -1,
                 };
-                (self.fg_state.current_rainbow_color_index as i32 + N_BG as i32 + increment)
+                (self.fg_state.current_rainbow_color_index as i32 + N_FG as i32 + increment)
                     as usize
                     % N_FG
             }
@@ -450,14 +522,14 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
                     true => 1,
                     false => -1,
                 };
-                (self.trigger_state.current_rainbow_color_index as i32 + N_BG as i32 + increment)
+                (self.trigger_state.current_rainbow_color_index as i32 + N_TG as i32 + increment)
                     as usize
                     % N_TG
             }
         }
     }
 
-    fn get_current_rainbow_color(&mut self, ani_type: AnimationType) -> Color {
+    fn current_rainbow_color(&mut self, ani_type: AnimationType) -> Color {
         match ani_type {
             AnimationType::Background => {
                 self.parameters.bg.rainbow.colors[self.bg_state.current_rainbow_color_index]
@@ -472,16 +544,16 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         }
     }
 
-    fn get_next_rainbow_color(&mut self, ani_type: AnimationType) -> Color {
+    fn next_rainbow_color(&mut self, ani_type: AnimationType) -> Color {
         match ani_type {
             AnimationType::Background => {
-                self.parameters.bg.rainbow.colors[self.get_next_rainbow_index(ani_type)]
+                self.parameters.bg.rainbow.colors[self.next_rainbow_index(ani_type)]
             }
             AnimationType::Foreground => {
-                self.parameters.fg.rainbow.colors[self.get_next_rainbow_index(ani_type)]
+                self.parameters.fg.rainbow.colors[self.next_rainbow_index(ani_type)]
             }
             AnimationType::Trigger => {
-                self.parameters.trigger.rainbow.colors[self.get_next_rainbow_index(ani_type)]
+                self.parameters.trigger.rainbow.colors[self.next_rainbow_index(ani_type)]
             }
         }
     }
@@ -490,24 +562,22 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         match ani_type {
             AnimationType::Background => {
                 if N_BG != 0 {
-                    self.bg_state.current_rainbow_color_index =
-                        self.get_next_rainbow_index(ani_type);
+                    self.bg_state.current_rainbow_color_index = self.next_rainbow_index(ani_type);
                 } else {
                     self.bg_state.current_rainbow_color_index = 0;
                 }
             }
             AnimationType::Foreground => {
-                if N_BG != 0 {
-                    self.fg_state.current_rainbow_color_index =
-                        self.get_next_rainbow_index(ani_type);
+                if N_FG != 0 {
+                    self.fg_state.current_rainbow_color_index = self.next_rainbow_index(ani_type);
                 } else {
                     self.fg_state.current_rainbow_color_index = 0;
                 }
             }
             AnimationType::Trigger => {
-                if N_BG != 0 {
+                if N_TG != 0 {
                     self.trigger_state.current_rainbow_color_index =
-                        self.get_next_rainbow_index(ani_type);
+                        self.next_rainbow_index(ani_type);
                 } else {
                     self.trigger_state.current_rainbow_color_index = 0;
                 }
@@ -558,7 +628,7 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
 
             let mid_color = c::Color::color_lerp(
                 factor as i32,
-                0 as i32,
+                0,
                 distance_between_colors as i32,
                 start_color,
                 end_color,
@@ -567,6 +637,25 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
             let translated_led_index = self.translation_array[led_index];
 
             logical_strip.set_color_at_index(translated_led_index, mid_color);
+        }
+    }
+
+    fn fill_marquee(&mut self, color: c::Color, logical_strip: &mut LogicalStrip<N_LED>) {
+        for led_index in 0..N_LED {
+            // every time the index is evenly divisible by the number of subpixels, toggle the state
+            // that the pixels should be set to:
+            let subpip_number = led_index % (self.parameters.fg.num_pixels_per_marquee_pip * 2);
+
+            if subpip_number < self.parameters.fg.num_pixels_per_marquee_pip
+                && self.fg_state.marquee_position_toggle
+            {
+                logical_strip.set_color_at_index(self.translation_array[led_index], color);
+            }
+            if subpip_number >= self.parameters.fg.num_pixels_per_marquee_pip
+                && !self.fg_state.marquee_position_toggle
+            {
+                logical_strip.set_color_at_index(self.translation_array[led_index], color);
+            }
         }
     }
 
@@ -593,26 +682,11 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
     fn update_bg_solid_fade(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
         if self.bg_state.has_been_triggered {
             self.advance_rainbow_index(AnimationType::Background);
-            self.bg_state.current_frame = 0;
+            self.bg_state.current_duration_frame = 0;
             self.bg_state.has_been_triggered = false;
         }
-        let previous_frame = self.bg_state.current_frame;
-        self.increment_bg_frames();
-        // Check to see when the color rolls over:
-        if self.bg_state.current_frame < previous_frame {
-            self.advance_rainbow_index(AnimationType::Background);
-        }
-        let current_color = self.get_current_rainbow_color(AnimationType::Background);
-        let next_color = self.get_next_rainbow_color(AnimationType::Background);
-        let intermediate_color = c::Color::color_lerp(
-            self.bg_state.current_frame as i32,
-            0,
-            self.bg_state.total_frames as i32,
-            current_color,
-            next_color,
-        );
         for led_index in self.translation_array {
-            logical_strip.set_color_at_index(led_index, intermediate_color);
+            logical_strip.set_color_at_index(led_index, self.calculate_bg_slow_fade_color());
         }
     }
 
@@ -628,7 +702,7 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
     }
 
     fn update_bg_fill_rainbow_rotate(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
-        self.increment_bg_frames();
+        self.increment_bg_duration_frames();
         // handle trigger condition:
         if self.bg_state.has_been_triggered {
             self.bg_state.offset =
@@ -642,9 +716,9 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         // then modulo back to a u16 value using MAX_OFFSET when done.
         let mut color_start_offset = self.bg_state.offset;
 
-        if self.bg_state.total_frames != 0 {
-            color_start_offset += (MAX_OFFSET as u32 * self.bg_state.current_frame
-                / self.bg_state.total_frames) as u16;
+        if self.bg_state.total_duration_frames != 0 {
+            color_start_offset += (MAX_OFFSET as u32 * self.bg_state.current_duration_frame
+                / self.bg_state.total_duration_frames) as u16;
         }
         color_start_offset %= MAX_OFFSET;
 
@@ -653,42 +727,58 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
 
     // Foregrounds:
 
-    fn update_fg_no_foreground(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
+    fn update_fg_no_foreground(&mut self, _: &mut LogicalStrip<N_LED>) {
         // Do Nothing
     }
 
     fn update_fg_marquee_solid(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
-        todo!()
+        if self.fg_state.has_been_triggered {
+            self.advance_rainbow_index(AnimationType::Foreground);
+            self.fg_state.has_been_triggered = false;
+        }
+        let color = self.current_rainbow_color(AnimationType::Foreground);
+        self.increment_marquee_step();
+        self.fill_marquee(color, logical_strip);
     }
 
     fn update_fg_marquee_solid_fixed(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
-        todo!()
+        if self.fg_state.has_been_triggered {
+            self.advance_rainbow_index(AnimationType::Foreground);
+            self.fg_state.has_been_triggered = false;
+        }
+        let color = self.current_rainbow_color(AnimationType::Foreground);
+        self.fill_marquee(color, logical_strip);
     }
 
     fn update_fg_marquee_fade(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
-        todo!()
+        if self.fg_state.has_been_triggered {
+            self.advance_rainbow_index(AnimationType::Foreground);
+            self.fg_state.current_duration_frame = 0;
+            self.fg_state.has_been_triggered = false;
+        }
+        self.increment_marquee_step();
+        let intermediate_color = self.calculate_fg_slow_fade_color();
+        self.fill_marquee(intermediate_color, logical_strip);
     }
 
     fn update_fg_marquee_fade_fixed(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
-        todo!()
+        if self.fg_state.has_been_triggered {
+            self.advance_rainbow_index(AnimationType::Foreground);
+            self.fg_state.current_duration_frame = 0;
+            self.fg_state.has_been_triggered = false;
+        }
+        let intermediate_color = self.calculate_fg_slow_fade_color();
+        self.fill_marquee(intermediate_color, logical_strip);
     }
 
     fn update_fg_vu_meter(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
-        todo!()
+        // TODO
     }
 
     // Triggers:
 
     fn update_tg_no_trigger(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
         // Do Nothing
-    }
-
-    fn update_tg_background(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
-        todo!()
-    }
-
-    fn update_tg_foreground(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {
-        todo!()
     }
 
     fn update_tg_color_pulse(&mut self, logical_strip: &mut LogicalStrip<N_LED>) {

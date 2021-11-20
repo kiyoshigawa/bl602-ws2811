@@ -44,7 +44,8 @@ where
         let frame_rate = frame_rate.into();
         let mut lc = LightingController { logical_strip, animations, frame_rate, timer };
         for animation in lc.animations.iter_mut() {
-            animation.init_total_frames(lc.frame_rate);
+            animation.init_total_duration_frames(lc.frame_rate);
+            animation.init_total_step_frames(lc.frame_rate);
         }
         // calculate the period of the frame rate in nanoseconds
         let frame_period = 1_000_000_000_u64 / frame_rate.integer() as u64; // 1E9 Nanoseconds / Hz = Period in ns
@@ -54,8 +55,7 @@ where
         lc
     }
 
-    pub fn update(&mut self, hc: &mut HardwareController<impl PeriodicTimer>)
-    {
+    pub fn update(&mut self, hc: &mut HardwareController<impl PeriodicTimer>) {
         // Only update if it's been longer than the frame rate period since the last update:
         if self.timer.periodic_check_timeout().is_ok() {
             for animation in self.animations.iter_mut() {

@@ -569,6 +569,8 @@ impl<const N_BG: usize, const N_FG: usize, const N_TG: usize, const N_LED: usize
         for (led_index, &led_position) in self.led_position_array.iter().enumerate() {
             // move the led position by offset rather than the rainbow itself
             let shifted_position = (led_position as usize + MAX_OFFSET - start_offset) % MAX_OFFSET;
+
+            // all positions from one color to just before the next map to a rainbow bucket index
             let rainbow_bucket = shifted_position / distance_between_colors;
             let bucket_start = rainbow_bucket * distance_between_colors;
 

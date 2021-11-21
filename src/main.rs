@@ -170,10 +170,10 @@ fn main() -> ! {
 
     // Make a single animation operating on the whole strip:
     let n_a = a::Animation::new(da::ANI_TEST, n_ta, 2173481723);
-    let e_a = a::Animation::new(da::ANI_TEST, s_ta, 2173481723);
-    let s_a = a::Animation::new(da::ANI_TEST, e_ta, 2173481723);
-    let w_a = a::Animation::new(da::ANI_TEST, w_ta, 2173481723);
-    let animation_array: &Animation = [&n_a, &e_a, &s_a, &w_a];
+    let e_a = a::Animation::new(da::ANI_TEST, e_ta, 9238479238);
+    let s_a = a::Animation::new(da::ANI_TEST, s_ta, 2309489849);
+    let w_a = a::Animation::new(da::ANI_TEST, w_ta, 3928392389);
+    let animation_array: [&Animation; 4] = [&n_a, &e_a, &s_a, &w_a];
 
     let mut lc =
         lc::LightingController::new(office_strip, animation_array, 60_u32.Hz(), &mut timer_ch1);

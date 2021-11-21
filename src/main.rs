@@ -17,6 +17,7 @@ use crate::hardware::{DynamicPin, HardwareController};
 use bl602_hal as hal;
 use core::fmt::Write;
 // use embedded_hal::delay::blocking::DelayMs;
+use crate::animations::Animation;
 use embedded_time::rate::*;
 use hal::{
     clock::{Strict, SysclkFreq, UART_PLL_FREQ},
@@ -27,35 +28,41 @@ use hal::{
 };
 use panic_halt as _;
 
+// How many LEDs on each wall:
+const NUM_LEDS_SOUTH_WALL: usize = 34;
+const NUM_LEDS_EAST_WALL: usize = 49;
+const NUM_LEDS_NORTH_WALL: usize = 35;
+const NUM_LEDS_WEST_WALL: usize = 49;
+
 // Real Values:
 // The number of LEDs on each strip:
-// const NUM_LEDS_WINDOW_STRIP: usize = 74;
-// const NUM_LEDS_DOOR_STRIP: usize = 59;
-// const NUM_LEDS_CLOSET_STRIP: usize = 34;
+const NUM_LEDS_WINDOW_STRIP: usize = 74;
+const NUM_LEDS_DOOR_STRIP: usize = 59;
+const NUM_LEDS_CLOSET_STRIP: usize = 34;
 
 // Test Strip Values:
 // The number of LEDs on each strip:
-const NUM_LEDS_WINDOW_STRIP: usize = 4;
-const NUM_LEDS_DOOR_STRIP: usize = 4;
-const NUM_LEDS_CLOSET_STRIP: usize = 4;
+// const NUM_LEDS_WINDOW_STRIP: usize = 4;
+// const NUM_LEDS_DOOR_STRIP: usize = 4;
+// const NUM_LEDS_CLOSET_STRIP: usize = 4;
 
 // individual strips:
 const CLOSET_STRIP: strip::PhysicalStrip = strip::PhysicalStrip {
     led_count: NUM_LEDS_CLOSET_STRIP,
     reversed: false,
-    color_order: strip::ColorOrder::GRB,
+    color_order: strip::ColorOrder::BRG,
     strip_timings: strip::StripTimings::WS2812_ADAFRUIT,
 };
 const WINDOW_STRIP: strip::PhysicalStrip = strip::PhysicalStrip {
     led_count: NUM_LEDS_WINDOW_STRIP,
     reversed: false,
-    color_order: strip::ColorOrder::GRB,
+    color_order: strip::ColorOrder::BRG,
     strip_timings: strip::StripTimings::WS2812_ADAFRUIT,
 };
 const DOOR_STRIP: strip::PhysicalStrip = strip::PhysicalStrip {
     led_count: NUM_LEDS_DOOR_STRIP,
     reversed: true,
-    color_order: strip::ColorOrder::GRB,
+    color_order: strip::ColorOrder::BRG,
     strip_timings: strip::StripTimings::WS2812_ADAFRUIT,
 };
 
@@ -141,15 +148,32 @@ fn main() -> ! {
 
     let mut hc = HardwareController::new(pins, timer_ch0);
 
-    // For now, the translation array is just all the leds on the office_strip
-    let mut translation_array: [usize; NUM_LEDS] = [0; NUM_LEDS];
-    for (index, value) in translation_array.iter_mut().enumerate() {
+    let mut n_ta: [usize; NUM_LEDS_NORTH_WALL] = [0; NUM_LEDS_NORTH_WALL];
+    for (index, value) in n_ta.iter_mut().enumerate() {
+        *value = index;
+    }
+
+    let mut e_ta: [usize; NUM_LEDS_EAST_WALL] = [0; NUM_LEDS_EAST_WALL];
+    for (index, value) in e_ta.iter_mut().enumerate() {
+        *value = index;
+    }
+
+    let mut s_ta: [usize; NUM_LEDS_SOUTH_WALL] = [0; NUM_LEDS_SOUTH_WALL];
+    for (index, value) in s_ta.iter_mut().enumerate() {
+        *value = index;
+    }
+
+    let mut w_ta: [usize; NUM_LEDS_WEST_WALL] = [0; NUM_LEDS_WEST_WALL];
+    for (index, value) in w_ta.iter_mut().enumerate() {
         *value = index;
     }
 
     // Make a single animation operating on the whole strip:
-    let a = a::Animation::new(da::ANI_TEST, translation_array, 2173481723);
-    let animation_array = [a];
+    let n_a = a::Animation::new(da::ANI_TEST, n_ta, 2173481723);
+    let e_a = a::Animation::new(da::ANI_TEST, s_ta, 2173481723);
+    let s_a = a::Animation::new(da::ANI_TEST, e_ta, 2173481723);
+    let w_a = a::Animation::new(da::ANI_TEST, w_ta, 2173481723);
+    let animation_array: &Animation = [&n_a, &e_a, &s_a, &w_a];
 
     let mut lc =
         lc::LightingController::new(office_strip, animation_array, 60_u32.Hz(), &mut timer_ch1);

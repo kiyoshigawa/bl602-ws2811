@@ -92,14 +92,14 @@ pub mod ws28xx {
         }
     }
 
-    pub struct LogicalStrip<'a, const NUM_LEDS: usize> {
-        color_buffer: [c::Color; NUM_LEDS],
+    pub struct LogicalStrip<'a> {
+        color_buffer: &'a mut [c::Color],
         strips: &'a [PhysicalStrip],
     }
 
-    impl<'a, const NUM_LEDS: usize> LogicalStrip<'a, NUM_LEDS> {
-        pub fn new(strips: &'a [PhysicalStrip]) -> Self {
-            LogicalStrip::<NUM_LEDS> { color_buffer: [c::Color::default(); NUM_LEDS], strips }
+    impl<'a> LogicalStrip<'a> {
+        pub fn new(color_buffer: &'a mut [c::Color], strips: &'a [PhysicalStrip]) -> Self {
+            LogicalStrip { color_buffer, strips }
         }
 
         // this sets the color value in the color array at index:
@@ -109,7 +109,7 @@ pub mod ws28xx {
 
         // this fills the entire strip with a single color:
         pub fn set_strip_to_solid_color(&mut self, color: c::Color) {
-            for c in &mut self.color_buffer {
+            for c in &mut self.color_buffer.iter_mut() {
                 c.set_color(color);
             }
         }

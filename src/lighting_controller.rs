@@ -6,38 +6,23 @@ use embedded_time::duration::Nanoseconds;
 use embedded_time::fixed_point::FixedPoint;
 use embedded_time::rate::Hertz;
 
-pub struct LightingController<
-    'a,
-    Timer,
-    const N_FG: usize,
-    const N_BG: usize,
-    const N_TG: usize,
-    const N_LED: usize,
-    const N_ANI: usize,
-> where
+pub struct LightingController<'a, Timer, const N_ANI: usize>
+where
     Timer: PeriodicTimer,
 {
-    logical_strip: LogicalStrip<'a, N_LED>,
-    animations: [a::Animation<N_BG, N_FG, N_TG, N_LED>; N_ANI],
+    logical_strip: LogicalStrip<'a>,
+    animations: [&'a mut dyn a::Animatable<'a>; N_ANI],
     frame_rate: Hertz,
     timer: &'a mut Timer,
 }
 
-impl<
-        'a,
-        Timer,
-        const N_FG: usize,
-        const N_BG: usize,
-        const N_TG: usize,
-        const N_LED: usize,
-        const N_ANI: usize,
-    > LightingController<'a, Timer, N_FG, N_BG, N_TG, N_LED, N_ANI>
+impl<'a, Timer, const N_ANI: usize> LightingController<'a, Timer, N_ANI>
 where
     Timer: PeriodicTimer,
 {
     pub fn new(
-        logical_strip: LogicalStrip<'a, N_LED>,
-        animations: [a::Animation<N_BG, N_FG, N_TG, N_LED>; N_ANI],
+        logical_strip: LogicalStrip<'a>,
+        animations: [&'a mut (dyn a::Animatable<'a> + 'a); N_ANI],
         frame_rate: impl Into<Hertz>,
         timer: &'a mut Timer,
     ) -> Self {

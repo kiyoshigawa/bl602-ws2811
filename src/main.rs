@@ -9,6 +9,7 @@ pub mod leds;
 pub mod lighting_controller;
 
 use crate::animations as a;
+use crate::colors as c;
 use crate::default_animations as da;
 use crate::leds::ws28xx as strip;
 use crate::lighting_controller as lc;
@@ -17,7 +18,7 @@ use crate::hardware::{DynamicPin, HardwareController};
 use bl602_hal as hal;
 use core::fmt::Write;
 // use embedded_hal::delay::blocking::DelayMs;
-use crate::animations::Animation;
+use crate::animations::Animatable;
 use embedded_time::rate::*;
 use hal::{
     clock::{Strict, SysclkFreq, UART_PLL_FREQ},
@@ -144,7 +145,8 @@ fn main() -> ! {
 
     writeln!(serial, "Debug Serial Initialized...\r").ok();
 
-    let office_strip = strip::LogicalStrip::<NUM_LEDS>::new(&ALL_STRIPS);
+    let mut color_buffer: [c::Color; NUM_LEDS] = [c::Color::default(); NUM_LEDS];
+    let office_strip = strip::LogicalStrip::new(&mut color_buffer, &ALL_STRIPS);
 
     let mut hc = HardwareController::new(pins, timer_ch0);
 
@@ -169,11 +171,11 @@ fn main() -> ! {
     }
 
     // Make a single animation operating on the whole strip:
-    let n_a = a::Animation::new(da::ANI_TEST, n_ta, 2173481723);
-    let e_a = a::Animation::new(da::ANI_TEST, e_ta, 9238479238);
-    let s_a = a::Animation::new(da::ANI_TEST, s_ta, 2309489849);
-    let w_a = a::Animation::new(da::ANI_TEST, w_ta, 3928392389);
-    let animation_array: [&Animation; 4] = [&n_a, &e_a, &s_a, &w_a];
+    let mut n_a = a::Animation::new(da::ANI_TEST, n_ta, 2173481723);
+    let mut e_a = a::Animation::new(da::ANI_TEST, e_ta, 9238479238);
+    let mut s_a = a::Animation::new(da::ANI_TEST, s_ta, 2309489849);
+    let mut w_a = a::Animation::new(da::ANI_TEST, w_ta, 3928392389);
+    let animation_array: [&mut dyn Animatable; 4] = [&mut n_a, &mut e_a, &mut s_a, &mut w_a];
 
     let mut lc =
         lc::LightingController::new(office_strip, animation_array, 60_u32.Hz(), &mut timer_ch1);

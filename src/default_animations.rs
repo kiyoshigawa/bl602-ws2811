@@ -16,9 +16,9 @@ pub const DEFAULT_NUMBER_OF_PIXELS_PER_MARQUEE_PIP: usize = 1;
 // in animations. They're also good examples of the kinds of things you can do with animations.
 
 /// This background parameter struct can be used to turn off all background effects
-pub const BG_OFF: AnimationBackgroundParameters<1> = AnimationBackgroundParameters {
+pub const BG_OFF: AnimationBackgroundParameters = AnimationBackgroundParameters {
     mode: BackgroundMode::NoBackground,
-    rainbow: c::R_OFF,
+    rainbow: &c::R_OFF.colors,
     direction: Direction::Stopped,
     is_rainbow_reversed: false,
     duration_ns: 0,
@@ -26,9 +26,9 @@ pub const BG_OFF: AnimationBackgroundParameters<1> = AnimationBackgroundParamete
 };
 
 /// This foreground parameter struct can be used to turn off all foreground effects
-pub const FG_OFF: AnimationForegroundParameters<1> = AnimationForegroundParameters {
+pub const FG_OFF: AnimationForegroundParameters = AnimationForegroundParameters {
     mode: ForegroundMode::NoForeground,
-    rainbow: c::R_OFF,
+    rainbow: &c::R_OFF.colors,
     direction: Direction::Stopped,
     is_rainbow_reversed: false,
     duration_ns: 0,
@@ -38,20 +38,20 @@ pub const FG_OFF: AnimationForegroundParameters<1> = AnimationForegroundParamete
 };
 
 /// This global trigger parameter struct can be used to turn off all trigger effects.
-pub const TRIGGER_OFF: AnimationGlobalTriggerParameters<1> = AnimationGlobalTriggerParameters {
-    rainbow: c::R_OFF,
+pub const TRIGGER_OFF: AnimationGlobalTriggerParameters = AnimationGlobalTriggerParameters {
+    rainbow: &c::R_OFF.colors,
     is_rainbow_reversed: false,
     duration_ns: 0,
 };
 
 /// This animation parameter struct will turn off ALL animations: fg, bg, and trigger.
-pub const ANI_ALL_OFF: AnimationParameters<1, 1, 1> =
+pub const ANI_ALL_OFF: AnimationParameters =
     AnimationParameters { bg: BG_OFF, fg: FG_OFF, trigger: TRIGGER_OFF };
 
 /// This is an animation background struct used for testing
-pub const BG_TEST: AnimationBackgroundParameters<4> = AnimationBackgroundParameters {
+pub const BG_TEST: AnimationBackgroundParameters = AnimationBackgroundParameters {
     mode: BackgroundMode::FillRainbowRotate,
-    rainbow: c::R_ROYGBIV,
+    rainbow: &c::R_ROYGBIV.colors,
     direction: Direction::Positive,
     is_rainbow_reversed: false,
     duration_ns: 60_000_000_000,
@@ -59,9 +59,9 @@ pub const BG_TEST: AnimationBackgroundParameters<4> = AnimationBackgroundParamet
 };
 
 /// This is an animation foreground struct used for testing
-pub const FG_TEST: AnimationForegroundParameters<1> = AnimationForegroundParameters {
+pub const FG_TEST: AnimationForegroundParameters = AnimationForegroundParameters {
     mode: ForegroundMode::MarqueeFade,
-    rainbow: c::R_OFF,
+    rainbow: &c::R_OFF.colors,
     direction: Direction::Positive,
     is_rainbow_reversed: false,
     duration_ns: 10_000_000_000,
@@ -71,12 +71,12 @@ pub const FG_TEST: AnimationForegroundParameters<1> = AnimationForegroundParamet
 };
 
 /// This is an animation trigger struct used for testing
-pub const TRIGGER_TEST: AnimationGlobalTriggerParameters<1> = AnimationGlobalTriggerParameters {
-    rainbow: c::R_OFF,
+pub const TRIGGER_TEST: AnimationGlobalTriggerParameters = AnimationGlobalTriggerParameters {
+    rainbow: &c::R_OFF.colors,
     is_rainbow_reversed: false,
     duration_ns: 0,
 };
 
 /// This animation parameter struct will turn off ALL animations: fg, bg, and trigger.
-pub const ANI_TEST: AnimationParameters<4, 1, 1> =
+pub const ANI_TEST: AnimationParameters =
     AnimationParameters { bg: BG_TEST, fg: FG_TEST, trigger: TRIGGER_TEST };

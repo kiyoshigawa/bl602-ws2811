@@ -79,4 +79,4 @@ pub const TRIGGER_TEST: AnimationGlobalTriggerParameters = AnimationGlobalTrigge
 
 /// This animation parameter struct will turn off ALL animations: fg, bg, and trigger.
 pub const ANI_TEST: AnimationParameters =
-    AnimationParameters { bg: BG_TEST, fg: FG_TEST, trigger: TRIGGER_TEST };
+    AnimationParameters { bg: BG_TEST, fg: FG_OFF, trigger: TRIGGER_TEST };

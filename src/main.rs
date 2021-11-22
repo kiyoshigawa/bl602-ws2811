@@ -157,17 +157,17 @@ fn main() -> ! {
 
     let mut e_ta: [usize; NUM_LEDS_EAST_WALL] = [0; NUM_LEDS_EAST_WALL];
     for (index, value) in e_ta.iter_mut().enumerate() {
-        *value = index;
+        *value = index + NUM_LEDS_NORTH_WALL;
     }
 
     let mut s_ta: [usize; NUM_LEDS_SOUTH_WALL] = [0; NUM_LEDS_SOUTH_WALL];
     for (index, value) in s_ta.iter_mut().enumerate() {
-        *value = index;
+        *value = index + NUM_LEDS_NORTH_WALL + NUM_LEDS_EAST_WALL;
     }
 
     let mut w_ta: [usize; NUM_LEDS_WEST_WALL] = [0; NUM_LEDS_WEST_WALL];
     for (index, value) in w_ta.iter_mut().enumerate() {
-        *value = index;
+        *value = index + NUM_LEDS_NORTH_WALL + NUM_LEDS_EAST_WALL + NUM_LEDS_SOUTH_WALL;
     }
 
     // Make a single animation operating on the whole strip:

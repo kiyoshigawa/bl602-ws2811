@@ -150,32 +150,32 @@ fn main() -> ! {
 
     let mut hc = HardwareController::new(pins, timer_ch0);
 
-    let mut n_ta: [usize; NUM_LEDS_NORTH_WALL] = [0; NUM_LEDS_NORTH_WALL];
-    for (index, value) in n_ta.iter_mut().enumerate() {
+    let mut s_ta: [usize; NUM_LEDS_SOUTH_WALL] = [0; NUM_LEDS_SOUTH_WALL];
+    for (index, value) in s_ta.iter_mut().enumerate() {
         *value = index;
     }
 
     let mut e_ta: [usize; NUM_LEDS_EAST_WALL] = [0; NUM_LEDS_EAST_WALL];
     for (index, value) in e_ta.iter_mut().enumerate() {
-        *value = index + NUM_LEDS_NORTH_WALL;
+        *value = index + NUM_LEDS_SOUTH_WALL;
     }
 
-    let mut s_ta: [usize; NUM_LEDS_SOUTH_WALL] = [0; NUM_LEDS_SOUTH_WALL];
-    for (index, value) in s_ta.iter_mut().enumerate() {
-        *value = index + NUM_LEDS_NORTH_WALL + NUM_LEDS_EAST_WALL;
+    let mut n_ta: [usize; NUM_LEDS_NORTH_WALL] = [0; NUM_LEDS_NORTH_WALL];
+    for (index, value) in n_ta.iter_mut().enumerate() {
+        *value = index + NUM_LEDS_SOUTH_WALL + NUM_LEDS_EAST_WALL;
     }
 
     let mut w_ta: [usize; NUM_LEDS_WEST_WALL] = [0; NUM_LEDS_WEST_WALL];
     for (index, value) in w_ta.iter_mut().enumerate() {
-        *value = index + NUM_LEDS_NORTH_WALL + NUM_LEDS_EAST_WALL + NUM_LEDS_SOUTH_WALL;
+        *value = index + NUM_LEDS_SOUTH_WALL + NUM_LEDS_EAST_WALL + NUM_LEDS_NORTH_WALL;
     }
 
     // Make a single animation operating on the whole strip:
-    let mut n_a = a::Animation::new(da::ANI_TEST, n_ta, 2173481723);
+    let mut s_a = a::Animation::new(da::ANI_TEST, s_ta, 2173481723);
     let mut e_a = a::Animation::new(da::ANI_TEST, e_ta, 9238479238);
-    let mut s_a = a::Animation::new(da::ANI_TEST, s_ta, 2309489849);
+    let mut n_a = a::Animation::new(da::ANI_TEST, n_ta, 2309489849);
     let mut w_a = a::Animation::new(da::ANI_TEST, w_ta, 3928392389);
-    let animation_array: [&mut dyn Animatable; 4] = [&mut n_a, &mut e_a, &mut s_a, &mut w_a];
+    let animation_array: [&mut dyn Animatable; 4] = [&mut s_a, &mut e_a, &mut n_a, &mut w_a];
 
     let mut lc =
         lc::LightingController::new(office_strip, animation_array, 60_u32.Hz(), &mut timer_ch1);
@@ -184,20 +184,24 @@ fn main() -> ! {
     // let mut d = bl602_hal::delay::McycleDelay::new(clocks.sysclk().0);
 
     let test_trigger = a::AnimationTriggerParameters {
-        mode: a::TriggerMode::Background,
+        mode: a::TriggerMode::Flash,
         direction: a::Direction::Stopped,
         step_time_ns: 0,
-        fade_in_time_ns: 0,
-        fade_out_time_ns: 0,
+        fade_in_time_ns: 250_000_000,
+        fade_out_time_ns: 750_000_000,
         starting_offset: 0,
     };
 
     // let mut i = 0_u16;
+    let mut last_time = riscv::register::mcycle::read64();
     loop {
         lc.update(&mut hc);
         // i = (i + 1) % a::MAX_OFFSET;
         // lc.set_offset(0, a::AnimationType::Foreground, i);
-        // lc.trigger(0, &test_trigger);
+        if riscv::register::mcycle::read64() - last_time > 160_000_000 {
+            lc.trigger(0, &test_trigger);
+            last_time = riscv::register::mcycle::read64();
+        }
         // d.delay_ms(1).ok();
     }
 }

@@ -54,7 +54,7 @@ pub const BG_TEST: AnimationBackgroundParameters = AnimationBackgroundParameters
     rainbow: &c::R_ROYGBIV.colors,
     direction: Direction::Positive,
     is_rainbow_reversed: false,
-    duration_ns: 60_000_000_000,
+    duration_ns: 20_000_000_000,
     subdivisions: 0,
 };
 

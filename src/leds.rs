@@ -102,6 +102,10 @@ pub mod ws28xx {
             LogicalStrip { color_buffer, strips }
         }
 
+        pub fn get_color_at_index(&self, index: usize) -> c::Color {
+            self.color_buffer[index]
+        }
+
         // this sets the color value in the color array at index:
         pub fn set_color_at_index(&mut self, index: usize, color: c::Color) {
             self.color_buffer[index].set_color(color);

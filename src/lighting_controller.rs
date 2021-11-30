@@ -29,8 +29,8 @@ where
         let frame_rate = frame_rate.into();
         let mut lc = LightingController { logical_strip, animations, frame_rate, timer };
         for animation in lc.animations.iter_mut() {
-            animation.init_total_duration_frames(lc.frame_rate);
-            animation.init_total_step_frames(lc.frame_rate);
+            animation.init_total_animation_duration_frames(lc.frame_rate);
+            animation.init_total_animation_step_frames(lc.frame_rate);
         }
         // calculate the period of the frame rate in nanoseconds
         let frame_period = 1_000_000_000_u64 / frame_rate.integer() as u64; // 1E9 Nanoseconds / Hz = Period in ns
@@ -51,7 +51,7 @@ where
     }
 
     pub fn trigger(&mut self, animation_index: usize, params: &a::AnimationTriggerParameters) {
-        self.animations[animation_index].trigger(params);
+        self.animations[animation_index].trigger(params, self.frame_rate);
     }
 
     pub fn set_offset(&mut self, animation_index: usize, a_type: AnimationType, offset: u16) {

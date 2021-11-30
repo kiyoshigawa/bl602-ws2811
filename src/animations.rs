@@ -868,7 +868,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
                     let mid_color = Color::color_lerp(
                         ts.current_frame as i32,
                         0,
-                        ts.total_fade_in_frames as i32,
+                        (ts.total_fade_in_frames - 1) as i32,
                         logical_strip.get_color_at_index(led_index),
                         ts.color,
                     );
@@ -880,7 +880,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
                     let mid_color = Color::color_lerp(
                         (ts.current_frame - ts.total_fade_in_frames) as i32,
                         0,
-                        ts.total_fade_out_frames as i32,
+                        (ts.total_fade_out_frames - 1) as i32,
                         ts.color,
                         logical_strip.get_color_at_index(led_index),
                     );

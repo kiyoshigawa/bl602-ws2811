@@ -486,57 +486,69 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
     // Slow Fade Intermediate Color Calculators:
 
     fn calculate_bg_slow_fade_color(&mut self) -> Color {
-        let previous_frame = self.bg_state.current_duration_frame;
-        self.increment_fg_duration_frames();
-        // Check to see when the color rolls over:
-        if self.bg_state.current_duration_frame < previous_frame {
-            self.advance_rainbow_index(AnimationType::Background);
+        if self.bg_state.total_duration_frames != 0 {
+            let previous_frame = self.bg_state.current_duration_frame;
+            self.increment_fg_duration_frames();
+            // Check to see when the color rolls over:
+            if self.bg_state.current_duration_frame < previous_frame {
+                self.advance_rainbow_index(AnimationType::Background);
+            }
+            let current_color = self.current_rainbow_color(AnimationType::Background);
+            let next_color = self.next_rainbow_color(AnimationType::Background);
+            c::Color::color_lerp(
+                self.bg_state.current_duration_frame as i32,
+                0,
+                self.bg_state.total_duration_frames as i32,
+                current_color,
+                next_color,
+            )
+        } else {
+            self.current_rainbow_color(AnimationType::Background)
         }
-        let current_color = self.current_rainbow_color(AnimationType::Background);
-        let next_color = self.next_rainbow_color(AnimationType::Background);
-        c::Color::color_lerp(
-            self.bg_state.current_duration_frame as i32,
-            0,
-            self.bg_state.total_duration_frames as i32,
-            current_color,
-            next_color,
-        )
     }
 
     fn calculate_fg_slow_fade_color(&mut self) -> Color {
-        let previous_frame = self.fg_state.current_duration_frame;
-        self.increment_fg_duration_frames();
-        // Check to see when the color rolls over:
-        if self.fg_state.current_duration_frame < previous_frame {
-            self.advance_rainbow_index(AnimationType::Foreground);
+        if self.fg_state.total_duration_frames != 0 {
+            let previous_frame = self.fg_state.current_duration_frame;
+            self.increment_fg_duration_frames();
+            // Check to see when the color rolls over:
+            if self.fg_state.current_duration_frame < previous_frame {
+                self.advance_rainbow_index(AnimationType::Foreground);
+            }
+            let current_color = self.current_rainbow_color(AnimationType::Foreground);
+            let next_color = self.next_rainbow_color(AnimationType::Foreground);
+            c::Color::color_lerp(
+                self.fg_state.current_duration_frame as i32,
+                0,
+                self.fg_state.total_duration_frames as i32,
+                current_color,
+                next_color,
+            )
+        } else {
+            self.current_rainbow_color(AnimationType::Foreground)
         }
-        let current_color = self.current_rainbow_color(AnimationType::Foreground);
-        let next_color = self.next_rainbow_color(AnimationType::Foreground);
-        c::Color::color_lerp(
-            self.fg_state.current_duration_frame as i32,
-            0,
-            self.fg_state.total_duration_frames as i32,
-            current_color,
-            next_color,
-        )
     }
 
     fn calculate_trigger_slow_fade_color(&mut self) -> Color {
-        let previous_frame = self.trigger_state.current_duration_frame;
-        self.increment_fg_duration_frames();
-        // Check to see when the color rolls over:
-        if self.trigger_state.current_duration_frame < previous_frame {
-            self.advance_rainbow_index(AnimationType::Foreground);
+        if self.trigger_state.total_duration_frames != 0 {
+            let previous_frame = self.trigger_state.current_duration_frame;
+            self.increment_fg_duration_frames();
+            // Check to see when the color rolls over:
+            if self.trigger_state.current_duration_frame < previous_frame {
+                self.advance_rainbow_index(AnimationType::Trigger);
+            }
+            let current_color = self.current_rainbow_color(AnimationType::Trigger);
+            let next_color = self.next_rainbow_color(AnimationType::Trigger);
+            c::Color::color_lerp(
+                self.trigger_state.current_duration_frame as i32,
+                0,
+                self.trigger_state.total_duration_frames as i32,
+                current_color,
+                next_color,
+            )
+        } else {
+            self.current_rainbow_color(AnimationType::Trigger)
         }
-        let current_color = self.current_rainbow_color(AnimationType::Foreground);
-        let next_color = self.next_rainbow_color(AnimationType::Foreground);
-        c::Color::color_lerp(
-            self.trigger_state.current_duration_frame as i32,
-            0,
-            self.trigger_state.total_duration_frames as i32,
-            current_color,
-            next_color,
-        )
     }
 
     // Rainbow Position Controls:

@@ -72,7 +72,7 @@ pub const FG_TEST: AnimationForegroundParameters = AnimationForegroundParameters
 
 /// This is an animation trigger struct used for testing
 pub const TRIGGER_TEST: AnimationGlobalTriggerParameters = AnimationGlobalTriggerParameters {
-    rainbow: &c::R_OFF.colors,
+    rainbow: &c::R_ROYGBIV.colors,
     is_rainbow_reversed: false,
     duration_ns: 0,
 };

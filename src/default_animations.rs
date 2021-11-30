@@ -74,7 +74,7 @@ pub const FG_TEST: AnimationForegroundParameters = AnimationForegroundParameters
 pub const TRIGGER_TEST: AnimationGlobalTriggerParameters = AnimationGlobalTriggerParameters {
     rainbow: &c::R_ROYGBIV.colors,
     is_rainbow_reversed: false,
-    duration_ns: 0,
+    duration_ns: 10_000_000_000,
 };
 
 /// This animation parameter struct will turn off ALL animations: fg, bg, and trigger.

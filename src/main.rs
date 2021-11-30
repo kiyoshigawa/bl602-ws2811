@@ -184,7 +184,7 @@ fn main() -> ! {
     // let mut d = bl602_hal::delay::McycleDelay::new(clocks.sysclk().0);
 
     let test_trigger = a::AnimationTriggerParameters {
-        mode: a::TriggerMode::FlashSlowFade,
+        mode: a::TriggerMode::FlashRainbow,
         direction: a::Direction::Stopped,
         step_time_ns: 0,
         fade_in_time_ns: 250_000_000,

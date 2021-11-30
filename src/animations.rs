@@ -137,6 +137,7 @@ pub enum TriggerMode {
 }
 
 /// Denotes the direction of animations, effects vary depending on animation modes:
+#[derive(Copy, Clone)]
 pub enum Direction {
     Positive,
     Stopped,
@@ -203,17 +204,6 @@ pub struct AnimationTriggerParameters {
     pub starting_offset: u16,
 }
 
-/// This contains all the information needed to keep track of the current state of a trigger
-/// animation. It is updated every frame to match the current state of the animation.
-struct AnimationTriggerState {
-    mode: TriggerMode,
-    current_frame: u32,
-    total_fade_in_frames: u32,
-    total_fade_out_frames: u32,
-    last_direction: Direction,
-    color: c::Color,
-}
-
 /// This contains all the information needed to keep track of the current state of a foreground or
 /// background animation. It is updated every frame to match the current state of the animation.
 #[derive(Default)]
@@ -235,6 +225,18 @@ struct AnimationGlobalTriggerState {
     current_rainbow_color_index: usize,
     current_duration_frame: u32,
     total_duration_frames: u32,
+}
+
+/// This contains all the information needed to keep track of the current state of a trigger
+/// animation. It is updated every frame to match the current state of the animation.
+struct AnimationTriggerState {
+    mode: TriggerMode,
+    current_frame: u32,
+    total_fade_in_frames: u32,
+    total_fade_out_frames: u32,
+    direction: Direction,
+    current_offset: u16,
+    color: c::Color,
 }
 
 /// This struct contains all the fixed parameters of an animation, as well as the state of the
@@ -285,13 +287,34 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
     }
 
     fn trigger(&mut self, params: &AnimationTriggerParameters, frame_rate: Hertz) {
-        // function to make flash trigger given a color:
+        let random_offset = (self.random_number_generator.next_u32() % MAX_OFFSET as u32) as u16;
+        let starting_color_bucket = params.starting_offset / Self::OFFSET_BETWEEN_LEDS;
+        let starting_color_offset = starting_color_bucket * Self::OFFSET_BETWEEN_LEDS;
+        let init_color_pulse_trigger = |color| AnimationTriggerState {
+            mode: params.mode,
+            current_frame: 0,
+            total_fade_in_frames: Self::convert_ns_to_frames(params.fade_in_time_ns, frame_rate),
+            total_fade_out_frames: Self::convert_ns_to_frames(params.fade_out_time_ns, frame_rate),
+            direction: Direction::Stopped,
+            current_offset: random_offset,
+            color,
+        };
+        let init_color_shot_trigger = |color| AnimationTriggerState {
+            mode: params.mode,
+            current_frame: 0,
+            total_fade_in_frames: Self::convert_ns_to_frames(params.step_time_ns, frame_rate),
+            total_fade_out_frames: 0, // not used with color shots, fade in represents step duration
+            direction: params.direction,
+            current_offset: starting_color_offset,
+            color,
+        };
         let init_flash_trigger = |color| AnimationTriggerState {
             mode: params.mode,
             current_frame: 0,
             total_fade_in_frames: Self::convert_ns_to_frames(params.fade_in_time_ns, frame_rate),
             total_fade_out_frames: Self::convert_ns_to_frames(params.fade_out_time_ns, frame_rate),
-            last_direction: Direction::Stopped,
+            direction: Direction::Stopped,
+            current_offset: 0,
             color,
         };
         match params.mode {
@@ -305,22 +328,36 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
                 self.fg_state.has_been_triggered = true;
             }
             TriggerMode::ColorPulse => {
-                todo!()
+                let new_trigger_state =
+                    init_color_pulse_trigger(self.current_rainbow_color(AnimationType::Trigger));
+                self.add_trigger(new_trigger_state);
             }
             TriggerMode::ColorPulseSlowFade => {
-                todo!()
+                let new_trigger_state =
+                    init_color_pulse_trigger(self.calculate_trigger_slow_fade_color());
+                self.add_trigger(new_trigger_state);
             }
             TriggerMode::ColorPulseRainbow => {
-                todo!()
+                let new_trigger_state =
+                    init_color_pulse_trigger(self.current_rainbow_color(AnimationType::Trigger));
+                self.advance_rainbow_index(AnimationType::Trigger);
+                self.add_trigger(new_trigger_state);
             }
             TriggerMode::ColorShot => {
-                todo!()
+                let new_trigger_state =
+                    init_color_shot_trigger(self.current_rainbow_color(AnimationType::Trigger));
+                self.add_trigger(new_trigger_state);
             }
             TriggerMode::ColorShotSlowFade => {
-                todo!()
+                let new_trigger_state =
+                    init_color_shot_trigger(self.calculate_trigger_slow_fade_color());
+                self.add_trigger(new_trigger_state);
             }
             TriggerMode::ColorShotRainbow => {
-                todo!()
+                let new_trigger_state =
+                    init_color_shot_trigger(self.current_rainbow_color(AnimationType::Trigger));
+                self.advance_rainbow_index(AnimationType::Trigger);
+                self.add_trigger(new_trigger_state);
             }
             TriggerMode::Flash => {
                 let new_trigger_state =
@@ -359,6 +396,8 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
 }
 
 impl<'a, const N_LED: usize> Animation<'a, N_LED> {
+    const OFFSET_BETWEEN_LEDS: u16 = MAX_OFFSET / N_LED as u16;
+
     pub fn new(
         parameters: AnimationParameters<'a>,
         translation_array: [usize; N_LED],
@@ -368,12 +407,11 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
         // number of LEDs <N_LED> in the animation. The LED positions are distributed evenly over
         // the entire range from 0..MAX_OFFSET, to increase the effective supersampling resolution of
         // the animation.
-        let single_led_offset = MAX_OFFSET / N_LED as u16;
         let mut current_led_offset = 0;
         let mut led_position_array = [0_u16; N_LED];
         for led in led_position_array.iter_mut() {
             *led = current_led_offset;
-            current_led_offset += single_led_offset;
+            current_led_offset += Self::OFFSET_BETWEEN_LEDS;
         }
         let random_number_generator = SmallRng::seed_from_u64(random_seed);
         Animation {
@@ -871,40 +909,42 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
 
     fn update_tg_flash(&mut self, logical_strip: &mut LogicalStrip, trigger_index: usize) {
         // prevent out of bounds errors if someone calls this with a bad index:
-        if trigger_index < self.triggers.len() {
-            let ts = &mut self.triggers[trigger_index];
+        if trigger_index >= self.triggers.len() {
+            return;
+        }
 
-            if ts.current_frame < ts.total_fade_in_frames {
-                // fading in interpolation:
-                for led_index in self.translation_array {
-                    let mid_color = Color::color_lerp(
-                        ts.current_frame as i32,
-                        0,
-                        (ts.total_fade_in_frames - 1) as i32,
-                        logical_strip.get_color_at_index(led_index),
-                        ts.color,
-                    );
-                    logical_strip.set_color_at_index(led_index, mid_color);
-                }
-            } else {
-                // fading out interpolation:
-                for led_index in self.translation_array {
-                    let mid_color = Color::color_lerp(
-                        (ts.current_frame - ts.total_fade_in_frames) as i32,
-                        0,
-                        (ts.total_fade_out_frames - 1) as i32,
-                        ts.color,
-                        logical_strip.get_color_at_index(led_index),
-                    );
-                    logical_strip.set_color_at_index(led_index, mid_color);
-                }
-            }
-            ts.current_frame += 1;
+        let ts = &mut self.triggers[trigger_index];
 
-            // if we've done all the frames, get this trigger out of here!
-            if ts.current_frame >= ts.total_fade_in_frames + ts.total_fade_out_frames {
-                self.triggers.remove(trigger_index);
+        if ts.current_frame < ts.total_fade_in_frames {
+            // fading in interpolation:
+            for led_index in self.translation_array {
+                let mid_color = Color::color_lerp(
+                    ts.current_frame as i32,
+                    0,
+                    (ts.total_fade_in_frames - 1) as i32,
+                    logical_strip.get_color_at_index(led_index),
+                    ts.color,
+                );
+                logical_strip.set_color_at_index(led_index, mid_color);
             }
+        } else {
+            // fading out interpolation:
+            for led_index in self.translation_array {
+                let mid_color = Color::color_lerp(
+                    (ts.current_frame - ts.total_fade_in_frames) as i32,
+                    0,
+                    (ts.total_fade_out_frames - 1) as i32,
+                    ts.color,
+                    logical_strip.get_color_at_index(led_index),
+                );
+                logical_strip.set_color_at_index(led_index, mid_color);
+            }
+        }
+        ts.current_frame += 1;
+
+        // if we've done all the frames, get this trigger out of here!
+        if ts.current_frame >= ts.total_fade_in_frames + ts.total_fade_out_frames {
+            self.triggers.remove(trigger_index);
         }
     }
 

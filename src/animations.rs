@@ -413,19 +413,23 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
         // iterate the slow fade frames for slow fading color animations:
         self.increment_trigger_duration_frames();
 
-        //then iterate over the triggers in the vec:
-        for index in 0..self.triggers.len() {
+        // then iterate over the triggers in the vec. Note, these have to go in reverse, because
+        // if a trigger completes its animation and is removed, it would reduce the maximum index
+        // value resulting in panics when trying to access out of bounds.
+        for trigger_index in (0..self.triggers.len()).rev() {
             use TriggerMode::*;
-            match self.triggers[index].mode {
-                NoTrigger => self.update_tg_no_trigger(logical_strip, index),
+            match self.triggers[trigger_index].mode {
+                NoTrigger => self.update_tg_no_trigger(logical_strip, trigger_index),
                 Background | Foreground => (), // This is handled in the update_fg() functions
                 ColorPulse | ColorPulseSlowFade | ColorPulseRainbow => {
-                    self.update_tg_color_pulse(logical_strip, index)
+                    self.update_tg_color_pulse(logical_strip, trigger_index)
                 }
                 ColorShot | ColorShotSlowFade | ColorShotRainbow => {
-                    self.update_tg_color_shot(logical_strip, index)
+                    self.update_tg_color_shot(logical_strip, trigger_index)
                 }
-                Flash | FlashSlowFade | FlashRainbow => self.update_tg_flash(logical_strip, index),
+                Flash | FlashSlowFade | FlashRainbow => {
+                    self.update_tg_flash(logical_strip, trigger_index)
+                }
             }
         }
     }
@@ -841,51 +845,54 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
         let _ = self.triggers.try_push(trigger_state);
     }
 
-    fn update_tg_no_trigger(&mut self, logical_strip: &mut LogicalStrip, index: usize) {
+    fn update_tg_no_trigger(&mut self, logical_strip: &mut LogicalStrip, trigger_index: usize) {
         // Do Nothing
     }
 
-    fn update_tg_color_pulse(&mut self, logical_strip: &mut LogicalStrip, index: usize) {
+    fn update_tg_color_pulse(&mut self, logical_strip: &mut LogicalStrip, trigger_index: usize) {
         todo!()
     }
 
-    fn update_tg_color_shot(&mut self, logical_strip: &mut LogicalStrip, index: usize) {
+    fn update_tg_color_shot(&mut self, logical_strip: &mut LogicalStrip, trigger_index: usize) {
         todo!()
     }
 
-    fn update_tg_flash(&mut self, logical_strip: &mut LogicalStrip, index: usize) {
-        let ts = &mut self.triggers[index];
+    fn update_tg_flash(&mut self, logical_strip: &mut LogicalStrip, trigger_index: usize) {
+        // prevent out of bounds errors if someone calls this with a bad index:
+        if trigger_index < self.triggers.len() {
+            let ts = &mut self.triggers[trigger_index];
 
-        if ts.current_frame < ts.total_fade_in_frames {
-            // fading in interpolation:
-            for led_index in self.translation_array {
-                let mid_color = Color::color_lerp(
-                    ts.current_frame as i32,
-                    0,
-                    ts.total_fade_in_frames as i32,
-                    logical_strip.get_color_at_index(led_index),
-                    ts.color,
-                );
-                logical_strip.set_color_at_index(led_index, mid_color);
+            if ts.current_frame < ts.total_fade_in_frames {
+                // fading in interpolation:
+                for led_index in self.translation_array {
+                    let mid_color = Color::color_lerp(
+                        ts.current_frame as i32,
+                        0,
+                        ts.total_fade_in_frames as i32,
+                        logical_strip.get_color_at_index(led_index),
+                        ts.color,
+                    );
+                    logical_strip.set_color_at_index(led_index, mid_color);
+                }
+            } else {
+                // fading out interpolation:
+                for led_index in self.translation_array {
+                    let mid_color = Color::color_lerp(
+                        (ts.current_frame - ts.total_fade_in_frames) as i32,
+                        0,
+                        ts.total_fade_out_frames as i32,
+                        ts.color,
+                        logical_strip.get_color_at_index(led_index),
+                    );
+                    logical_strip.set_color_at_index(led_index, mid_color);
+                }
             }
-        } else {
-            // fading out interpolation:
-            for led_index in self.translation_array {
-                let mid_color = Color::color_lerp(
-                    (ts.current_frame - ts.total_fade_in_frames) as i32,
-                    0,
-                    ts.total_fade_out_frames as i32,
-                    ts.color,
-                    logical_strip.get_color_at_index(led_index),
-                );
-                logical_strip.set_color_at_index(led_index, mid_color);
-            }
-        }
-        ts.current_frame += 1;
+            ts.current_frame += 1;
 
-        // if we've done all the frames, get this trigger out of here!
-        if ts.current_frame >= ts.total_fade_in_frames + ts.total_fade_out_frames {
-            self.triggers.remove(index);
+            // if we've done all the frames, get this trigger out of here!
+            if ts.current_frame >= ts.total_fade_in_frames + ts.total_fade_out_frames {
+                self.triggers.remove(trigger_index);
+            }
         }
     }
 

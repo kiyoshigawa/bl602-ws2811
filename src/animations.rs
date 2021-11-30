@@ -858,25 +858,25 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
 
         if ts.current_frame < ts.total_fade_in_frames {
             // fading in interpolation:
-            for led_index in 0..self.translation_array.len() {
+            for led_index in self.translation_array {
                 let mid_color = Color::color_lerp(
                     ts.current_frame as i32,
                     0,
                     ts.total_fade_in_frames as i32,
-                    logical_strip.get_color_at_index(self.translation_array[led_index]),
+                    logical_strip.get_color_at_index(led_index),
                     ts.color,
                 );
                 logical_strip.set_color_at_index(led_index, mid_color);
             }
         } else {
             // fading out interpolation:
-            for led_index in 0..self.translation_array.len() {
+            for led_index in self.translation_array {
                 let mid_color = Color::color_lerp(
-                    ts.current_frame as i32,
-                    ts.total_fade_in_frames as i32,
+                    (ts.current_frame - ts.total_fade_in_frames) as i32,
+                    0,
                     ts.total_fade_out_frames as i32,
                     ts.color,
-                    logical_strip.get_color_at_index(self.translation_array[led_index]),
+                    logical_strip.get_color_at_index(led_index),
                 );
                 logical_strip.set_color_at_index(led_index, mid_color);
             }

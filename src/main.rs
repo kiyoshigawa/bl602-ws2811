@@ -187,8 +187,8 @@ fn main() -> ! {
         mode: a::TriggerMode::Flash,
         direction: a::Direction::Stopped,
         step_time_ns: 0,
-        fade_in_time_ns: 250_000_000,
-        fade_out_time_ns: 750_000_000,
+        fade_in_time_ns: 1_000_000_000,
+        fade_out_time_ns: 4_000_000_000,
         starting_offset: 0,
     };
 
@@ -198,7 +198,7 @@ fn main() -> ! {
         lc.update(&mut hc);
         // i = (i + 1) % a::MAX_OFFSET;
         // lc.set_offset(0, a::AnimationType::Foreground, i);
-        if riscv::register::mcycle::read64() - last_time > 160_000_000 {
+        if riscv::register::mcycle::read64() - last_time > (5 * 160_000_000) {
             lc.trigger(0, &test_trigger);
             last_time = riscv::register::mcycle::read64();
         }

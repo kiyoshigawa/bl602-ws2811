@@ -18,7 +18,7 @@ pub const DEFAULT_NUMBER_OF_PIXELS_PER_MARQUEE_PIP: usize = 1;
 /// This background parameter struct can be used to turn off all background effects
 pub const BG_OFF: AnimationBackgroundParameters = AnimationBackgroundParameters {
     mode: BackgroundMode::NoBackground,
-    rainbow: &c::R_OFF.colors,
+    rainbow: c::R_OFF,
     direction: Direction::Stopped,
     is_rainbow_reversed: false,
     duration_ns: 0,
@@ -28,7 +28,7 @@ pub const BG_OFF: AnimationBackgroundParameters = AnimationBackgroundParameters 
 /// This foreground parameter struct can be used to turn off all foreground effects
 pub const FG_OFF: AnimationForegroundParameters = AnimationForegroundParameters {
     mode: ForegroundMode::NoForeground,
-    rainbow: &c::R_OFF.colors,
+    rainbow: c::R_OFF,
     direction: Direction::Stopped,
     is_rainbow_reversed: false,
     duration_ns: 0,
@@ -39,7 +39,7 @@ pub const FG_OFF: AnimationForegroundParameters = AnimationForegroundParameters 
 
 /// This global trigger parameter struct can be used to turn off all trigger effects.
 pub const TRIGGER_OFF: AnimationGlobalTriggerParameters = AnimationGlobalTriggerParameters {
-    rainbow: &c::R_OFF.colors,
+    rainbow: c::R_OFF,
     is_rainbow_reversed: false,
     duration_ns: 0,
 };
@@ -51,7 +51,7 @@ pub const ANI_ALL_OFF: AnimationParameters =
 /// This is an animation background struct used for testing
 pub const BG_TEST: AnimationBackgroundParameters = AnimationBackgroundParameters {
     mode: BackgroundMode::FillRainbowRotate,
-    rainbow: &c::R_ROYGBIV.colors,
+    rainbow: c::R_ROYGBIV,
     direction: Direction::Positive,
     is_rainbow_reversed: false,
     duration_ns: 20_000_000_000,
@@ -61,7 +61,7 @@ pub const BG_TEST: AnimationBackgroundParameters = AnimationBackgroundParameters
 /// This is an animation foreground struct used for testing
 pub const FG_TEST: AnimationForegroundParameters = AnimationForegroundParameters {
     mode: ForegroundMode::MarqueeFade,
-    rainbow: &c::R_OFF.colors,
+    rainbow: c::R_OFF,
     direction: Direction::Positive,
     is_rainbow_reversed: false,
     duration_ns: 10_000_000_000,
@@ -72,7 +72,7 @@ pub const FG_TEST: AnimationForegroundParameters = AnimationForegroundParameters
 
 /// This is an animation trigger struct used for testing
 pub const TRIGGER_TEST: AnimationGlobalTriggerParameters = AnimationGlobalTriggerParameters {
-    rainbow: &c::R_ROYGBIV.colors,
+    rainbow: c::R_ROYGBIV,
     is_rainbow_reversed: false,
     duration_ns: 10_000_000_000,
 };

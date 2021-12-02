@@ -164,7 +164,7 @@ pub struct AnimationParameters<'a> {
 /// aspects of the animation can be derived from these parameters.
 pub struct AnimationBackgroundParameters<'a> {
     pub mode: BackgroundMode,
-    pub rainbow: &'a [c::Color],
+    pub rainbow: c::Rainbow<'a>,
     pub direction: Direction,
     pub is_rainbow_reversed: bool,
     pub duration_ns: u64,
@@ -175,7 +175,7 @@ pub struct AnimationBackgroundParameters<'a> {
 /// aspects of the animation can be derived from these parameters.
 pub struct AnimationForegroundParameters<'a> {
     pub mode: ForegroundMode,
-    pub rainbow: &'a [c::Color],
+    pub rainbow: c::Rainbow<'a>,
     pub direction: Direction,
     pub is_rainbow_reversed: bool,
     pub duration_ns: u64,
@@ -186,7 +186,7 @@ pub struct AnimationForegroundParameters<'a> {
 
 /// All triggers share a single rainbow / slow fade speed, which is configured in this struct
 pub struct AnimationGlobalTriggerParameters<'a> {
-    pub rainbow: &'a [c::Color],
+    pub rainbow: c::Rainbow<'a>,
     pub is_rainbow_reversed: bool,
     pub duration_ns: u64,
 }

@@ -73,9 +73,8 @@ pub const C_BLUE: Color = Color { r: 0, g: 0, b: 255 };
 pub const C_BLUE_PURPLE: Color = Color { r: 127, g: 0, b: 255 };
 pub const C_PURPLE: Color = Color { r: 255, g: 0, b: 255 };
 pub const C_DARK_PURPLE: Color = Color { r: 255, g: 0, b: 127 };
-pub const C_WHITE: Color = Color { r: 255, g: 255, b: 127 };
+pub const C_WHITE: Color = Color { r: 255, g: 255, b: 255 };
 pub const C_OFF: Color = Color { r: 0, g: 0, b: 0 };
-pub const C_FULL_ON: Color = Color { r: 255, g: 255, b: 255 };
 pub const C_T_3000K: Color = Color { r: 255, g: 180, b: 107 };
 pub const C_T_3500K: Color = Color { r: 255, g: 196, b: 137 };
 pub const C_T_4000K: Color = Color { r: 255, g: 209, b: 163 };
@@ -127,7 +126,7 @@ pub const R_DARK_GREEN_PATTERN: Rainbow = &dark_pattern(C_GREEN);
 pub const R_DARK_SKY_BLUE_PATTERN: Rainbow = &dark_pattern(C_SKY_BLUE);
 pub const R_DARK_BLUE_PATTERN: Rainbow = &dark_pattern(C_BLUE);
 pub const R_DARK_PURPLE_PATTERN: Rainbow = &dark_pattern(C_PURPLE);
-pub const R_WHITE_PATTERN: Rainbow = &dark_pattern(C_FULL_ON);
+pub const R_WHITE_PATTERN: Rainbow = &dark_pattern(C_WHITE);
 pub const R_VU_METER: Rainbow =
     &[
         C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_YELLOW, C_YELLOW, C_RED,

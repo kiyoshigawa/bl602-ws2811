@@ -1,7 +1,7 @@
 const IS_GAMMA_CORRECTION_ENABLED: bool = false;
 
 #[allow(dead_code)]
-#[derive(Default, Copy, Clone)]
+#[derive(Default, Copy, Clone, Debug)]
 pub struct Color {
     pub r: u8,
     pub g: u8,
@@ -46,8 +46,9 @@ impl Color {
         end_color: Color,
     ) -> Color {
         let lerp = |start: u8, end: u8| {
-            ((factor - in_min) * (end as i32 - start as i32) / (in_max - in_min) + start as i32)
-                as u8
+            let start = start as i32;
+            let end = end as i32;
+            ((factor - in_min) * (end - start) / (in_max - in_min) + start) as u8
         };
         let mut mid_color = C_OFF;
 
@@ -72,7 +73,7 @@ pub const C_BLUE: Color = Color { r: 0, g: 0, b: 255 };
 pub const C_BLUE_PURPLE: Color = Color { r: 127, g: 0, b: 255 };
 pub const C_PURPLE: Color = Color { r: 255, g: 0, b: 255 };
 pub const C_DARK_PURPLE: Color = Color { r: 255, g: 0, b: 127 };
-pub const C_WHITE: Color = Color { r: 255, g: 255, b: 127 };
+pub const C_WHITE: Color = Color { r: 255, g: 255, b: 255 };
 pub const C_OFF: Color = Color { r: 0, g: 0, b: 0 };
 pub const C_T_3000K: Color = Color { r: 255, g: 180, b: 107 };
 pub const C_T_3500K: Color = Color { r: 255, g: 196, b: 137 };
@@ -81,152 +82,96 @@ pub const C_T_5000K: Color = Color { r: 255, g: 228, b: 206 };
 
 // Use const generic rainbows to make iterable rainbows of various sizes. Rainbows contain a
 // list of colors in order, which will be used by animations as a color rainbow.
-#[derive(Copy, Clone)]
-pub struct Rainbow<const N: usize> {
-    pub colors: [Color; N],
+pub type Rainbow<'a> = &'a [Color];
+
+pub const R_OFF: Rainbow = &[C_OFF];
+pub const R_ON: Rainbow = &[C_WHITE];
+pub const R_RED: Rainbow = &[C_RED];
+pub const R_ORANGE: Rainbow = &[C_ORANGE];
+pub const R_YELLOW: Rainbow = &[C_YELLOW];
+pub const R_YELLOW_GREEN: Rainbow = &[C_YELLOW_GREEN];
+pub const R_GREEN: Rainbow = &[C_GREEN];
+pub const R_GREEN_BLUE: Rainbow = &[C_GREEN_BLUE];
+pub const R_SKY_BLUE: Rainbow = &[C_SKY_BLUE];
+pub const R_DEEP_BLUE: Rainbow = &[C_DEEP_BLUE];
+pub const R_BLUE: Rainbow = &[C_BLUE];
+pub const R_BLUE_PURPLE: Rainbow = &[C_BLUE_PURPLE];
+pub const R_PURPLE: Rainbow = &[C_PURPLE];
+pub const R_DARK_PURPLE: Rainbow = &[C_DARK_PURPLE];
+pub const R_ROYGBIV: Rainbow = &[C_RED, C_YELLOW, C_GREEN, C_BLUE];
+pub const R_RYB: Rainbow = &[C_RED, C_OFF, C_YELLOW, C_OFF, C_BLUE, C_OFF];
+pub const R_OGP: Rainbow = &[C_ORANGE, C_OFF, C_GREEN, C_OFF, C_PURPLE, C_OFF];
+pub const R_RGB: Rainbow = &[C_RED, C_OFF, C_GREEN, C_OFF, C_BLUE, C_OFF];
+pub const R_BY: Rainbow = &[C_BLUE, C_OFF, C_YELLOW, C_OFF];
+pub const R_RB: Rainbow = &[C_RED, C_OFF, C_SKY_BLUE, C_OFF];
+pub const R_OB: Rainbow = &[C_ORANGE, C_OFF, C_DEEP_BLUE, C_OFF];
+pub const R_BW: Rainbow = &[C_BLUE, C_OFF, C_WHITE, C_OFF];
+pub const R_RW: Rainbow = &[C_RED, C_OFF, C_WHITE, C_OFF];
+pub const R_GW: Rainbow = &[C_GREEN, C_OFF, C_WHITE, C_OFF];
+
+pub const fn dark_pattern(base: Color) -> [Color; 6] {
+    let mut colors = [C_OFF; 6];
+    let mut i = 0;
+    while i < 3 {
+        colors[i*2] = Color { r: base.r/2, g: base.g/2, b: base.b/2 };
+        colors[i*2+1] = Color { r: base.r/4, g: base.g/4, b: base.b/4 };
+        i += 1;
+    }
+    colors
 }
 
-pub const R_OFF: Rainbow<1> = Rainbow { colors: [C_OFF] };
-pub const R_ON: Rainbow<1> = Rainbow { colors: [C_WHITE] };
-pub const R_RED: Rainbow<1> = Rainbow { colors: [C_RED] };
-pub const R_ORANGE: Rainbow<1> = Rainbow { colors: [C_ORANGE] };
-pub const R_YELLOW: Rainbow<1> = Rainbow { colors: [C_YELLOW] };
-pub const R_YELLOW_GREEN: Rainbow<1> = Rainbow { colors: [C_YELLOW_GREEN] };
-pub const R_GREEN: Rainbow<1> = Rainbow { colors: [C_GREEN] };
-pub const R_GREEN_BLUE: Rainbow<1> = Rainbow { colors: [C_GREEN_BLUE] };
-pub const R_SKY_BLUE: Rainbow<1> = Rainbow { colors: [C_SKY_BLUE] };
-pub const R_DEEP_BLUE: Rainbow<1> = Rainbow { colors: [C_DEEP_BLUE] };
-pub const R_BLUE: Rainbow<1> = Rainbow { colors: [C_BLUE] };
-pub const R_BLUE_PURPLE: Rainbow<1> = Rainbow { colors: [C_BLUE_PURPLE] };
-pub const R_PURPLE: Rainbow<1> = Rainbow { colors: [C_PURPLE] };
-pub const R_DARK_PURPLE: Rainbow<1> = Rainbow { colors: [C_DARK_PURPLE] };
-pub const R_ROYGBIV: Rainbow<4> = Rainbow { colors: [C_RED, C_YELLOW, C_GREEN, C_BLUE] };
-pub const R_RYB: Rainbow<6> = Rainbow { colors: [C_RED, C_OFF, C_YELLOW, C_OFF, C_BLUE, C_OFF] };
-pub const R_OGP: Rainbow<6> =
-    Rainbow { colors: [C_ORANGE, C_OFF, C_GREEN, C_OFF, C_PURPLE, C_OFF] };
-pub const R_RGB: Rainbow<6> = Rainbow { colors: [C_RED, C_OFF, C_GREEN, C_OFF, C_BLUE, C_OFF] };
-pub const R_BY: Rainbow<4> = Rainbow { colors: [C_BLUE, C_OFF, C_YELLOW, C_OFF] };
-pub const R_RB: Rainbow<4> = Rainbow { colors: [C_RED, C_OFF, C_SKY_BLUE, C_OFF] };
-pub const R_OB: Rainbow<4> = Rainbow { colors: [C_ORANGE, C_OFF, C_DEEP_BLUE, C_OFF] };
-pub const R_BW: Rainbow<4> = Rainbow { colors: [C_BLUE, C_OFF, C_WHITE, C_OFF] };
-pub const R_RW: Rainbow<4> = Rainbow { colors: [C_RED, C_OFF, C_WHITE, C_OFF] };
-pub const R_GW: Rainbow<4> = Rainbow { colors: [C_GREEN, C_OFF, C_WHITE, C_OFF] };
-pub const R_DARK_RED_PATTERN: Rainbow<6> = Rainbow {
-    colors: [
-        Color { r: 127, g: 0, b: 0 },
-        Color { r: 64, g: 0, b: 0 },
-        Color { r: 127, g: 0, b: 0 },
-        Color { r: 64, g: 0, b: 0 },
-        Color { r: 127, g: 0, b: 0 },
-        Color { r: 64, g: 0, b: 0 },
-    ],
-};
-pub const R_DARK_YELLOW_PATTERN: Rainbow<6> = Rainbow {
-    colors: [
-        Color { r: 127, g: 127, b: 0 },
-        Color { r: 64, g: 64, b: 0 },
-        Color { r: 127, g: 127, b: 0 },
-        Color { r: 64, g: 64, b: 0 },
-        Color { r: 127, g: 127, b: 0 },
-        Color { r: 64, g: 64, b: 0 },
-    ],
-};
-pub const R_DARK_GREEN_PATTERN: Rainbow<6> = Rainbow {
-    colors: [
-        Color { r: 0, g: 127, b: 0 },
-        Color { r: 0, g: 64, b: 0 },
-        Color { r: 0, g: 127, b: 0 },
-        Color { r: 0, g: 64, b: 0 },
-        Color { r: 0, g: 127, b: 0 },
-        Color { r: 0, g: 64, b: 0 },
-    ],
-};
-pub const R_DARK_SKY_BLUE_PATTERN: Rainbow<6> = Rainbow {
-    colors: [
-        Color { r: 0, g: 127, b: 127 },
-        Color { r: 0, g: 64, b: 64 },
-        Color { r: 0, g: 127, b: 127 },
-        Color { r: 0, g: 64, b: 64 },
-        Color { r: 0, g: 127, b: 127 },
-        Color { r: 0, g: 64, b: 64 },
-    ],
-};
-pub const R_DARK_BLUE_PATTERN: Rainbow<6> = Rainbow {
-    colors: [
-        Color { r: 0, g: 0, b: 127 },
-        Color { r: 0, g: 0, b: 64 },
-        Color { r: 0, g: 0, b: 127 },
-        Color { r: 0, g: 0, b: 64 },
-        Color { r: 0, g: 0, b: 127 },
-        Color { r: 0, g: 0, b: 64 },
-    ],
-};
-pub const R_DARK_PURPLE_PATTERN: Rainbow<6> = Rainbow {
-    colors: [
-        Color { r: 127, g: 0, b: 127 },
-        Color { r: 64, g: 0, b: 64 },
-        Color { r: 127, g: 0, b: 127 },
-        Color { r: 64, g: 0, b: 64 },
-        Color { r: 127, g: 0, b: 127 },
-        Color { r: 64, g: 0, b: 64 },
-    ],
-};
-pub const R_WHITE_PATTERN: Rainbow<6> = Rainbow {
-    colors: [
-        Color { r: 127, g: 127, b: 127 },
-        Color { r: 64, g: 64, b: 64 },
-        Color { r: 127, g: 127, b: 127 },
-        Color { r: 64, g: 64, b: 64 },
-        Color { r: 127, g: 127, b: 127 },
-        Color { r: 64, g: 64, b: 64 },
-    ],
-};
-pub const R_VU_METER: Rainbow<10> = Rainbow {
-    colors: [
+pub const R_DARK_RED_PATTERN: Rainbow = &dark_pattern(C_RED);
+pub const R_DARK_YELLOW_PATTERN: Rainbow = &dark_pattern(C_YELLOW);
+pub const R_DARK_GREEN_PATTERN: Rainbow = &dark_pattern(C_GREEN);
+pub const R_DARK_SKY_BLUE_PATTERN: Rainbow = &dark_pattern(C_SKY_BLUE);
+pub const R_DARK_BLUE_PATTERN: Rainbow = &dark_pattern(C_BLUE);
+pub const R_DARK_PURPLE_PATTERN: Rainbow = &dark_pattern(C_PURPLE);
+pub const R_WHITE_PATTERN: Rainbow = &dark_pattern(C_WHITE);
+pub const R_VU_METER: Rainbow =
+    &[
         C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_YELLOW, C_YELLOW, C_RED,
-    ],
-};
+    ];
 
 pub const NUM_RAINBOWS: usize = 31;
 
 /// This is an array of the rainbow consts above that can be used to cycle through rainbows in animations.
 pub const RAINBOW_ARRAY: [&[Color]; NUM_RAINBOWS] = [
-    &R_OFF.colors,
-    &R_ON.colors,
-    &R_RED.colors,
-    &R_ORANGE.colors,
-    &R_YELLOW.colors,
-    &R_YELLOW_GREEN.colors,
-    &R_GREEN.colors,
-    &R_GREEN_BLUE.colors,
-    &R_SKY_BLUE.colors,
-    &R_DEEP_BLUE.colors,
-    &R_BLUE.colors,
-    &R_BLUE_PURPLE.colors,
-    &R_PURPLE.colors,
-    &R_DARK_PURPLE.colors,
-    &R_ROYGBIV.colors,
-    &R_RYB.colors,
-    &R_OGP.colors,
-    &R_RGB.colors,
-    &R_BY.colors,
-    &R_RB.colors,
-    &R_OB.colors,
-    &R_BW.colors,
-    &R_RW.colors,
-    &R_GW.colors,
-    &R_DARK_RED_PATTERN.colors,
-    &R_DARK_YELLOW_PATTERN.colors,
-    &R_DARK_GREEN_PATTERN.colors,
-    &R_DARK_SKY_BLUE_PATTERN.colors,
-    &R_DARK_BLUE_PATTERN.colors,
-    &R_DARK_PURPLE_PATTERN.colors,
-    &R_WHITE_PATTERN.colors,
+    &R_OFF,
+    &R_ON,
+    &R_RED,
+    &R_ORANGE,
+    &R_YELLOW,
+    &R_YELLOW_GREEN,
+    &R_GREEN,
+    &R_GREEN_BLUE,
+    &R_SKY_BLUE,
+    &R_DEEP_BLUE,
+    &R_BLUE,
+    &R_BLUE_PURPLE,
+    &R_PURPLE,
+    &R_DARK_PURPLE,
+    &R_ROYGBIV,
+    &R_RYB,
+    &R_OGP,
+    &R_RGB,
+    &R_BY,
+    &R_RB,
+    &R_OB,
+    &R_BW,
+    &R_RW,
+    &R_GW,
+    &R_DARK_RED_PATTERN,
+    &R_DARK_YELLOW_PATTERN,
+    &R_DARK_GREEN_PATTERN,
+    &R_DARK_SKY_BLUE_PATTERN,
+    &R_DARK_BLUE_PATTERN,
+    &R_DARK_PURPLE_PATTERN,
+    &R_WHITE_PATTERN,
 ];
 
 /// A color correction table for LEDs to make them look like the color you expect:
 /// Shamelessly stolen from Adafruit's neopixel library somewhere a long time ago.
-pub const GAMMA8: [u8; 256] = [
+pub static GAMMA8: [u8; 256] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5,
     5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 9, 9, 9, 10, 10, 10, 11, 11, 11, 12, 12, 13, 13, 13, 14,

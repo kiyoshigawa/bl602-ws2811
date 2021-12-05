@@ -209,10 +209,8 @@ pub struct AnimationTriggerParameters {
 #[derive(Default)]
 struct AnimationState {
     offset: u16,
-    current_duration_frame: u32,
-    total_duration_frames: u32,
-    current_step_frame: u32,
-    total_step_frames: u32,
+    frames: Progression,
+    step_frames: Progression,
     current_rainbow_color_index: usize,
     has_been_triggered: bool,
     marquee_position_toggle: bool,
@@ -223,8 +221,7 @@ struct AnimationState {
 #[derive(Default)]
 struct AnimationGlobalTriggerState {
     current_rainbow_color_index: usize,
-    current_duration_frame: u32,
-    total_duration_frames: u32,
+    frames: Progression,
 }
 
 /// This contains all the information needed to keep track of the current state of a trigger
@@ -379,18 +376,18 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
     }
 
     fn init_total_animation_duration_frames(&mut self, frame_rate: Hertz) {
-        self.bg_state.total_duration_frames =
+        self.bg_state.frames.total =
             Self::convert_ns_to_frames(self.parameters.bg.duration_ns, frame_rate);
-        self.fg_state.total_duration_frames =
+        self.fg_state.frames.total =
             Self::convert_ns_to_frames(self.parameters.fg.duration_ns, frame_rate);
-        self.trigger_state.total_duration_frames =
+        self.trigger_state.frames.total =
             Self::convert_ns_to_frames(self.parameters.trigger.duration_ns, frame_rate);
     }
 
     fn init_total_animation_step_frames(&mut self, frame_rate: Hertz) {
         // Background animations don't use steps, this can be set to 0 and ignored:
-        self.bg_state.total_step_frames = 0;
-        self.fg_state.total_step_frames =
+        self.bg_state.step_frames.total = 0;
+        self.fg_state.step_frames.total =
             Self::convert_ns_to_frames(self.parameters.fg.step_time_ns, frame_rate);
     }
 }
@@ -449,7 +446,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
 
     fn update_triggers(&mut self, logical_strip: &mut LogicalStrip) {
         // iterate the slow fade frames for slow fading color animations:
-        self.increment_trigger_duration_frames();
+        self.trigger_state.frames.increment();
 
         // then iterate over the triggers in the vec. Note, these have to go in reverse, because
         // if a trigger completes its animation and is removed, it would reduce the maximum index
@@ -472,50 +469,10 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
         }
     }
 
-    // Incrementers:
-
-    fn increment_bg_duration_frames(&mut self) {
-        if self.bg_state.total_duration_frames != 0 {
-            self.bg_state.current_duration_frame =
-                (self.bg_state.current_duration_frame + 1) % self.bg_state.total_duration_frames;
-        } else {
-            self.bg_state.current_duration_frame = 0
-        }
-    }
-
-    fn increment_fg_duration_frames(&mut self) {
-        if self.fg_state.total_duration_frames != 0 {
-            self.fg_state.current_duration_frame =
-                (self.fg_state.current_duration_frame + 1) % self.fg_state.total_duration_frames;
-        } else {
-            self.fg_state.current_duration_frame = 0
-        }
-    }
-
-    fn increment_fg_step_frames(&mut self) {
-        if self.fg_state.total_step_frames != 0 {
-            self.fg_state.current_step_frame =
-                (self.fg_state.current_step_frame + 1) % self.fg_state.total_step_frames;
-        } else {
-            self.fg_state.current_step_frame = 0
-        }
-    }
-
-    fn increment_trigger_duration_frames(&mut self) {
-        if self.trigger_state.total_duration_frames != 0 {
-            self.trigger_state.current_duration_frame = (self.trigger_state.current_duration_frame
-                + 1)
-                % self.trigger_state.total_duration_frames;
-        } else {
-            self.trigger_state.current_duration_frame = 0
-        }
-    }
-
     fn increment_marquee_step(&mut self) {
-        let previous_frame = self.fg_state.current_step_frame;
-        self.increment_fg_step_frames();
-        // Check to see when the color rolls over:
-        if self.fg_state.current_step_frame < previous_frame {
+        // Increment and check to see if the color rolls over:
+        let did_roll = self.fg_state.step_frames.checked_increment();
+        if did_roll {
             // toggle whether even or odd sub-pips are showing the marquee color:
             self.fg_state.marquee_position_toggle = !self.fg_state.marquee_position_toggle;
         }
@@ -524,69 +481,67 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
     // Slow Fade Intermediate Color Calculators:
 
     fn calculate_bg_slow_fade_color(&mut self) -> Color {
-        if self.bg_state.total_duration_frames != 0 {
-            let previous_frame = self.bg_state.current_duration_frame;
-            self.increment_fg_duration_frames();
-            // Check to see when the color rolls over:
-            if self.bg_state.current_duration_frame < previous_frame {
-                self.advance_rainbow_index(AnimationType::Background);
-            }
-            let current_color = self.current_rainbow_color(AnimationType::Background);
-            let next_color = self.next_rainbow_color(AnimationType::Background);
-            c::Color::color_lerp(
-                self.bg_state.current_duration_frame as i32,
-                0,
-                self.bg_state.total_duration_frames as i32,
-                current_color,
-                next_color,
-            )
-        } else {
-            self.current_rainbow_color(AnimationType::Background)
+        if self.bg_state.frames.total == 0 {
+            return self.current_rainbow_color(AnimationType::Background);
         }
+
+        // Check to see when the color rolls over:
+        let did_roll = self.bg_state.frames.checked_increment();
+        if did_roll {
+            self.advance_rainbow_index(AnimationType::Background);
+        }
+
+        let current_color = self.current_rainbow_color(AnimationType::Background);
+        let next_color = self.next_rainbow_color(AnimationType::Background);
+        c::Color::color_lerp(
+            self.bg_state.frames.current as i32,
+            0,
+            self.bg_state.frames.total as i32,
+            current_color,
+            next_color,
+        )
     }
 
     fn calculate_fg_slow_fade_color(&mut self) -> Color {
-        if self.fg_state.total_duration_frames != 0 {
-            let previous_frame = self.fg_state.current_duration_frame;
-            self.increment_fg_duration_frames();
-            // Check to see when the color rolls over:
-            if self.fg_state.current_duration_frame < previous_frame {
-                self.advance_rainbow_index(AnimationType::Foreground);
-            }
-            let current_color = self.current_rainbow_color(AnimationType::Foreground);
-            let next_color = self.next_rainbow_color(AnimationType::Foreground);
-            c::Color::color_lerp(
-                self.fg_state.current_duration_frame as i32,
-                0,
-                self.fg_state.total_duration_frames as i32,
-                current_color,
-                next_color,
-            )
-        } else {
-            self.current_rainbow_color(AnimationType::Foreground)
+        if self.fg_state.frames.total == 0 {
+            return self.current_rainbow_color(AnimationType::Foreground);
         }
+
+        // Check to see when the color rolls over:
+        let did_roll = self.fg_state.frames.checked_increment();
+        if did_roll {
+            self.advance_rainbow_index(AnimationType::Foreground);
+        }
+        let current_color = self.current_rainbow_color(AnimationType::Foreground);
+        let next_color = self.next_rainbow_color(AnimationType::Foreground);
+        c::Color::color_lerp(
+            self.fg_state.frames.current as i32,
+            0,
+            self.fg_state.frames.total as i32,
+            current_color,
+            next_color,
+        )
     }
 
     fn calculate_trigger_slow_fade_color(&mut self) -> Color {
-        if self.trigger_state.total_duration_frames != 0 {
-            let previous_frame = self.trigger_state.current_duration_frame;
-            self.increment_fg_duration_frames();
-            // Check to see when the color rolls over:
-            if self.trigger_state.current_duration_frame < previous_frame {
-                self.advance_rainbow_index(AnimationType::Trigger);
-            }
-            let current_color = self.current_rainbow_color(AnimationType::Trigger);
-            let next_color = self.next_rainbow_color(AnimationType::Trigger);
-            c::Color::color_lerp(
-                self.trigger_state.current_duration_frame as i32,
-                0,
-                self.trigger_state.total_duration_frames as i32,
-                current_color,
-                next_color,
-            )
-        } else {
-            self.current_rainbow_color(AnimationType::Trigger)
+        if self.trigger_state.frames.total == 0 {
+            return self.current_rainbow_color(AnimationType::Trigger)
         }
+
+        // Check to see when the color rolls over:
+        let did_roll = self.trigger_state.frames.checked_increment();
+        if did_roll {
+            self.advance_rainbow_index(AnimationType::Trigger);
+        }
+        let current_color = self.current_rainbow_color(AnimationType::Trigger);
+        let next_color = self.next_rainbow_color(AnimationType::Trigger);
+        c::Color::color_lerp(
+            self.trigger_state.frames.current as i32,
+            0,
+            self.trigger_state.frames.total as i32,
+            current_color,
+            next_color,
+        )
     }
 
     // Rainbow Position Controls:
@@ -781,7 +736,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
     fn update_bg_solid_fade(&mut self, logical_strip: &mut LogicalStrip) {
         if self.bg_state.has_been_triggered {
             self.advance_rainbow_index(AnimationType::Background);
-            self.bg_state.current_duration_frame = 0;
+            self.bg_state.frames.current = 0;
             self.bg_state.has_been_triggered = false;
         }
         for led_index in self.translation_array {
@@ -801,7 +756,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
     }
 
     fn update_bg_fill_rainbow_rotate(&mut self, logical_strip: &mut LogicalStrip) {
-        self.increment_bg_duration_frames();
+        self.bg_state.frames.increment();
         // handle trigger condition:
         if self.bg_state.has_been_triggered {
             self.bg_state.offset =
@@ -815,9 +770,9 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
         // then modulo back to a u16 value using MAX_OFFSET when done.
         let mut color_start_offset = self.bg_state.offset;
 
-        if self.bg_state.total_duration_frames != 0 {
-            color_start_offset += (MAX_OFFSET as u32 * self.bg_state.current_duration_frame
-                / self.bg_state.total_duration_frames) as u16;
+        if self.bg_state.frames.total != 0 {
+            color_start_offset += (MAX_OFFSET as u32 * self.bg_state.frames.current
+                / self.bg_state.frames.total) as u16;
         }
         color_start_offset %= MAX_OFFSET;
 
@@ -859,7 +814,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
     fn update_fg_marquee_fade(&mut self, logical_strip: &mut LogicalStrip) {
         if self.fg_state.has_been_triggered {
             self.advance_rainbow_index(AnimationType::Foreground);
-            self.fg_state.current_duration_frame = 0;
+            self.fg_state.frames.current = 0;
             self.fg_state.has_been_triggered = false;
         }
         self.increment_marquee_step();
@@ -870,7 +825,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
     fn update_fg_marquee_fade_fixed(&mut self, logical_strip: &mut LogicalStrip) {
         if self.fg_state.has_been_triggered {
             self.advance_rainbow_index(AnimationType::Foreground);
-            self.fg_state.current_duration_frame = 0;
+            self.fg_state.frames.current = 0;
             self.fg_state.has_been_triggered = false;
         }
 
@@ -952,5 +907,23 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
 
     fn convert_ns_to_frames(nanos: u64, frame_rate: Hertz) -> u32 {
         (nanos * frame_rate.integer() as u64 / 1_000_000_000_u64) as u32
+    }
+}
+
+#[derive(Default, Debug)]
+struct Progression {
+    current: u32,
+    total: u32,
+}
+
+impl Progression {
+    fn increment(&mut self) {
+        if self.total == 0 { return; }
+        self.current = (self.current + 1) % self.total;
+    }
+
+    fn checked_increment(&mut self) -> bool {
+        self.increment();
+        self.current == 0
     }
 }

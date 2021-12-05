@@ -145,6 +145,7 @@ pub enum Direction {
 }
 
 /// Denotes the main types of animations, e.g. Foreground, Background, or Trigger:
+#[derive(Clone, Copy)]
 pub enum AnimationType {
     Background,
     Foreground,
@@ -331,7 +332,7 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
             }
             TriggerMode::ColorPulseSlowFade => {
                 let new_trigger_state =
-                    init_color_pulse_trigger(self.calculate_trigger_slow_fade_color());
+                    init_color_pulse_trigger(self.calculate_slow_fade_color(AnimationType::Trigger));
                 self.add_trigger(new_trigger_state);
             }
             TriggerMode::ColorPulseRainbow => {
@@ -347,7 +348,7 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
             }
             TriggerMode::ColorShotSlowFade => {
                 let new_trigger_state =
-                    init_color_shot_trigger(self.calculate_trigger_slow_fade_color());
+                    init_color_shot_trigger(self.calculate_slow_fade_color(AnimationType::Trigger));
                 self.add_trigger(new_trigger_state);
             }
             TriggerMode::ColorShotRainbow => {
@@ -363,7 +364,7 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
             }
             TriggerMode::FlashSlowFade => {
                 let new_trigger_state =
-                    init_flash_trigger(self.calculate_trigger_slow_fade_color());
+                    init_flash_trigger(self.calculate_slow_fade_color(AnimationType::Trigger));
                 self.add_trigger(new_trigger_state);
             }
             TriggerMode::FlashRainbow => {
@@ -479,69 +480,27 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
     }
 
     // Slow Fade Intermediate Color Calculators:
+    fn calculate_slow_fade_color(&mut self, anim_type: AnimationType) -> Color {
+        let frames = match anim_type {
+            AnimationType::Background => &mut self.bg_state.frames,
+            AnimationType::Foreground => &mut self.fg_state.frames,
+            AnimationType::Trigger => &mut self.trigger_state.frames,
+        };
 
-    fn calculate_bg_slow_fade_color(&mut self) -> Color {
-        if self.bg_state.frames.total == 0 {
-            return self.current_rainbow_color(AnimationType::Background);
+        if frames.total == 0 {
+            return self.current_rainbow_color(anim_type);
         }
 
-        // Check to see when the color rolls over:
-        let did_roll = self.bg_state.frames.checked_increment();
+        let did_roll = frames.checked_increment();
+        let progress = *frames;
+
         if did_roll {
-            self.advance_rainbow_index(AnimationType::Background);
+            self.advance_rainbow_index(anim_type);
         }
 
-        let current_color = self.current_rainbow_color(AnimationType::Background);
-        let next_color = self.next_rainbow_color(AnimationType::Background);
-        c::Color::color_lerp(
-            self.bg_state.frames.current as i32,
-            0,
-            self.bg_state.frames.total as i32,
-            current_color,
-            next_color,
-        )
-    }
-
-    fn calculate_fg_slow_fade_color(&mut self) -> Color {
-        if self.fg_state.frames.total == 0 {
-            return self.current_rainbow_color(AnimationType::Foreground);
-        }
-
-        // Check to see when the color rolls over:
-        let did_roll = self.fg_state.frames.checked_increment();
-        if did_roll {
-            self.advance_rainbow_index(AnimationType::Foreground);
-        }
-        let current_color = self.current_rainbow_color(AnimationType::Foreground);
-        let next_color = self.next_rainbow_color(AnimationType::Foreground);
-        c::Color::color_lerp(
-            self.fg_state.frames.current as i32,
-            0,
-            self.fg_state.frames.total as i32,
-            current_color,
-            next_color,
-        )
-    }
-
-    fn calculate_trigger_slow_fade_color(&mut self) -> Color {
-        if self.trigger_state.frames.total == 0 {
-            return self.current_rainbow_color(AnimationType::Trigger)
-        }
-
-        // Check to see when the color rolls over:
-        let did_roll = self.trigger_state.frames.checked_increment();
-        if did_roll {
-            self.advance_rainbow_index(AnimationType::Trigger);
-        }
-        let current_color = self.current_rainbow_color(AnimationType::Trigger);
-        let next_color = self.next_rainbow_color(AnimationType::Trigger);
-        c::Color::color_lerp(
-            self.trigger_state.frames.current as i32,
-            0,
-            self.trigger_state.frames.total as i32,
-            current_color,
-            next_color,
-        )
+        let current_color = self.current_rainbow_color(anim_type);
+        let next_color = self.next_rainbow_color(anim_type);
+        current_color.lerp_with(next_color, progress)
     }
 
     // Rainbow Position Controls:
@@ -740,7 +699,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
             self.bg_state.has_been_triggered = false;
         }
         for led_index in self.translation_array {
-            logical_strip.set_color_at_index(led_index, self.calculate_bg_slow_fade_color());
+            logical_strip.set_color_at_index(led_index, self.calculate_slow_fade_color(AnimationType::Background));
         }
     }
 
@@ -818,7 +777,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
             self.fg_state.has_been_triggered = false;
         }
         self.increment_marquee_step();
-        let intermediate_color = self.calculate_fg_slow_fade_color();
+        let intermediate_color = self.calculate_slow_fade_color(AnimationType::Foreground);
         self.fill_marquee(intermediate_color, logical_strip);
     }
 
@@ -835,7 +794,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
         let led_bucket = self.fg_state.offset as usize / pip_distance.max(1);
         self.fg_state.marquee_position_toggle = led_bucket % 2 == 0;
 
-        let intermediate_color = self.calculate_fg_slow_fade_color();
+        let intermediate_color = self.calculate_slow_fade_color(AnimationType::Foreground);
         self.fill_marquee(intermediate_color, logical_strip);
     }
 
@@ -910,7 +869,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Copy, Clone)]
 struct Progression {
     current: u32,
     total: u32,
@@ -925,5 +884,17 @@ impl Progression {
     fn checked_increment(&mut self) -> bool {
         self.increment();
         self.current == 0
+    }
+}
+
+impl Color {
+    fn lerp_with(&self, to_color: Color, factor: Progression) -> Color {
+        c::Color::color_lerp(
+            factor.current as i32,
+            0,
+            factor.total as i32,
+            *self,
+            to_color,
+        )
     }
 }

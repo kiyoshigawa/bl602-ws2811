@@ -315,64 +315,53 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
             current_offset: 0,
             color,
         };
-        match params.mode {
-            TriggerMode::NoTrigger => {
-                // Do Nothing
-            }
-            TriggerMode::Background => {
+
+        use TriggerMode::*;
+        let current_color = self.current_rainbow_color(AnimationType::Trigger);
+        let new_trigger_state = match params.mode {
+            NoTrigger => { None }
+            Background => {
                 self.bg_state.has_been_triggered = true;
+                None
             }
-            TriggerMode::Foreground => {
+            Foreground => {
                 self.fg_state.has_been_triggered = true;
+                None
             }
-            TriggerMode::ColorPulse => {
-                let new_trigger_state =
-                    init_color_pulse_trigger(self.current_rainbow_color(AnimationType::Trigger));
-                self.add_trigger(new_trigger_state);
+            ColorPulse => {
+                Some(init_color_pulse_trigger(current_color))
             }
-            TriggerMode::ColorPulseSlowFade => {
-                let new_trigger_state =
-                    init_color_pulse_trigger(self.calculate_slow_fade_color(AnimationType::Trigger));
-                self.add_trigger(new_trigger_state);
+            ColorPulseSlowFade => {
+                Some(init_color_pulse_trigger(self.calculate_slow_fade_color(AnimationType::Trigger)))
             }
-            TriggerMode::ColorPulseRainbow => {
-                let new_trigger_state =
-                    init_color_pulse_trigger(self.current_rainbow_color(AnimationType::Trigger));
+            ColorPulseRainbow => {
                 self.advance_rainbow_index(AnimationType::Trigger);
-                self.add_trigger(new_trigger_state);
+                Some(init_color_pulse_trigger(current_color))
             }
-            TriggerMode::ColorShot => {
-                let new_trigger_state =
-                    init_color_shot_trigger(self.current_rainbow_color(AnimationType::Trigger));
-                self.add_trigger(new_trigger_state);
+            ColorShot => {
+                Some(init_color_shot_trigger(current_color))
             }
-            TriggerMode::ColorShotSlowFade => {
-                let new_trigger_state =
-                    init_color_shot_trigger(self.calculate_slow_fade_color(AnimationType::Trigger));
-                self.add_trigger(new_trigger_state);
+            ColorShotSlowFade => {
+                Some(init_color_shot_trigger(self.calculate_slow_fade_color(AnimationType::Trigger)))
             }
-            TriggerMode::ColorShotRainbow => {
-                let new_trigger_state =
-                    init_color_shot_trigger(self.current_rainbow_color(AnimationType::Trigger));
+            ColorShotRainbow => {
                 self.advance_rainbow_index(AnimationType::Trigger);
-                self.add_trigger(new_trigger_state);
+                Some(init_color_shot_trigger(current_color))
             }
-            TriggerMode::Flash => {
-                let new_trigger_state =
-                    init_flash_trigger(self.current_rainbow_color(AnimationType::Trigger));
-                self.add_trigger(new_trigger_state);
+            Flash => {
+                Some(init_flash_trigger(current_color))
             }
-            TriggerMode::FlashSlowFade => {
-                let new_trigger_state =
-                    init_flash_trigger(self.calculate_slow_fade_color(AnimationType::Trigger));
-                self.add_trigger(new_trigger_state);
+            FlashSlowFade => {
+                Some(init_flash_trigger(self.calculate_slow_fade_color(AnimationType::Trigger)))
             }
-            TriggerMode::FlashRainbow => {
-                let new_trigger_state =
-                    init_flash_trigger(self.current_rainbow_color(AnimationType::Trigger));
+            FlashRainbow => {
                 self.advance_rainbow_index(AnimationType::Trigger);
-                self.add_trigger(new_trigger_state);
+                Some(init_flash_trigger(current_color))
             }
+        };
+
+        if let Some(trigger_state) = new_trigger_state {
+            self.add_trigger(trigger_state);
         }
     }
 

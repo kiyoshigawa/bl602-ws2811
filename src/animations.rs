@@ -181,7 +181,7 @@ pub struct AnimationForegroundParameters<'a> {
     pub duration_ns: u64,
     pub step_time_ns: u64,
     pub subdivisions: usize,
-    pub num_pixels_per_marquee_pip: usize,
+    pub pixels_per_pixel_group: usize,
 }
 
 /// All triggers share a single rainbow / slow fade speed, which is configured in this struct
@@ -202,6 +202,7 @@ pub struct AnimationTriggerParameters {
     pub fade_in_time_ns: u64,
     pub fade_out_time_ns: u64,
     pub starting_offset: u16,
+    pub pixels_per_pixel_group: usize,
 }
 
 /// This contains all the information needed to keep track of the current state of a foreground or
@@ -457,8 +458,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
         for trigger_index in (0..self.triggers.len()).rev() {
             use TriggerMode::*;
             match self.triggers[trigger_index].mode {
-                NoTrigger => self.update_tg_no_trigger(logical_strip, trigger_index),
-                Background | Foreground => (), // This is handled in the update_fg() functions
+                Background | Foreground | NoTrigger => (), // handled in other update functions
                 ColorPulse | ColorPulseSlowFade | ColorPulseRainbow => {
                     self.update_tg_color_pulse(logical_strip, trigger_index)
                 }
@@ -658,21 +658,21 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
     fn advance_rainbow_index(&mut self, ani_type: AnimationType) {
         match ani_type {
             AnimationType::Background => {
-                if self.parameters.bg.rainbow.len() != 0 {
+                if !self.parameters.bg.rainbow.is_empty() {
                     self.bg_state.current_rainbow_color_index = self.next_rainbow_index(ani_type);
                 } else {
                     self.bg_state.current_rainbow_color_index = 0;
                 }
             }
             AnimationType::Foreground => {
-                if self.parameters.fg.rainbow.len() != 0 {
+                if !self.parameters.fg.rainbow.is_empty() {
                     self.fg_state.current_rainbow_color_index = self.next_rainbow_index(ani_type);
                 } else {
                     self.fg_state.current_rainbow_color_index = 0;
                 }
             }
             AnimationType::Trigger => {
-                if self.parameters.trigger.rainbow.len() != 0 {
+                if !self.parameters.trigger.rainbow.is_empty() {
                     self.trigger_state.current_rainbow_color_index =
                         self.next_rainbow_index(ani_type);
                 } else {
@@ -743,14 +743,14 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
         for led_index in 0..N_LED {
             // every time the index is evenly divisible by the number of subpixels, toggle the state
             // that the pixels should be set to:
-            let subpip_number = led_index % (self.parameters.fg.num_pixels_per_marquee_pip * 2);
+            let subpip_number = led_index % (self.parameters.fg.pixels_per_pixel_group * 2);
 
-            if subpip_number < self.parameters.fg.num_pixels_per_marquee_pip
+            if subpip_number < self.parameters.fg.pixels_per_pixel_group
                 && self.fg_state.marquee_position_toggle
             {
                 logical_strip.set_color_at_index(self.translation_array[led_index], color);
             }
-            if subpip_number >= self.parameters.fg.num_pixels_per_marquee_pip
+            if subpip_number >= self.parameters.fg.pixels_per_pixel_group
                 && !self.fg_state.marquee_position_toggle
             {
                 logical_strip.set_color_at_index(self.translation_array[led_index], color);
@@ -848,7 +848,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
 
         // calculate the marquee_position_toggle based on the set offset value:
         let pip_distance =
-            (MAX_OFFSET as usize / N_LED) * self.parameters.fg.num_pixels_per_marquee_pip.max(1);
+            (MAX_OFFSET as usize / N_LED) * self.parameters.fg.pixels_per_pixel_group.max(1);
         let led_bucket = self.fg_state.offset as usize / pip_distance.max(1);
         self.fg_state.marquee_position_toggle = led_bucket % 2 == 0;
 
@@ -876,7 +876,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
 
         // calculate the marquee_position_toggle based on the set offset value:
         let pip_distance =
-            (MAX_OFFSET as usize / N_LED) * self.parameters.fg.num_pixels_per_marquee_pip.max(1);
+            (MAX_OFFSET as usize / N_LED) * self.parameters.fg.pixels_per_pixel_group.max(1);
         let led_bucket = self.fg_state.offset as usize / pip_distance.max(1);
         self.fg_state.marquee_position_toggle = led_bucket % 2 == 0;
 
@@ -893,10 +893,6 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
     fn add_trigger(&mut self, trigger_state: AnimationTriggerState) {
         // if the vector is still full, this will ignore the new trigger:
         let _ = self.triggers.try_push(trigger_state);
-    }
-
-    fn update_tg_no_trigger(&mut self, logical_strip: &mut LogicalStrip, trigger_index: usize) {
-        // Do Nothing
     }
 
     fn update_tg_color_pulse(&mut self, logical_strip: &mut LogicalStrip, trigger_index: usize) {

@@ -34,7 +34,7 @@ pub const FG_OFF: AnimationForegroundParameters = AnimationForegroundParameters 
     duration_ns: 0,
     step_time_ns: 0,
     subdivisions: DEFAULT_NUMBER_OF_SUBDIVISIONS,
-    num_pixels_per_marquee_pip: DEFAULT_NUMBER_OF_PIXELS_PER_MARQUEE_PIP,
+    pixels_per_pixel_group: DEFAULT_NUMBER_OF_PIXELS_PER_MARQUEE_PIP,
 };
 
 /// This global trigger parameter struct can be used to turn off all trigger effects.
@@ -67,7 +67,7 @@ pub const FG_TEST: AnimationForegroundParameters = AnimationForegroundParameters
     duration_ns: 10_000_000_000,
     step_time_ns: 150_000_000,
     subdivisions: DEFAULT_NUMBER_OF_SUBDIVISIONS,
-    num_pixels_per_marquee_pip: 1,
+    pixels_per_pixel_group: 1,
 };
 
 /// This is an animation trigger struct used for testing

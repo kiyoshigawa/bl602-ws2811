@@ -859,25 +859,37 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
 }
 
 #[derive(Default, Debug, Copy, Clone)]
-struct Progression {
-    current: u32,
-    total: u32,
+pub struct Progression {
+    pub current: u32,
+    pub total: u32,
 }
 
 impl Progression {
-    fn increment(&mut self) {
-        if self.total == 0 { return; }
-        self.current = (self.current + 1) % self.total;
+    pub fn new(total: u32) -> Self {
+        Self { current: 0, total }
     }
 
-    fn checked_increment(&mut self) -> bool {
+    pub fn increment(&mut self) {
+        if self.total == 0 { return; }
+        self.current = self.next();
+    }
+
+    pub fn checked_increment(&mut self) -> bool {
         self.increment();
         self.current == 0
+    }
+
+    pub fn next(&self) -> u32 {
+        (self.current + 1) % self.total
+    }
+
+    pub fn reset(&mut self) {
+        self.current = 0;
     }
 }
 
 impl Color {
-    fn lerp_with(&self, to_color: Color, factor: Progression) -> Color {
+    pub fn lerp_with(&self, to_color: Color, factor: Progression) -> Color {
         c::Color::color_lerp(
             factor.current as i32,
             0,

@@ -93,8 +93,8 @@ pub mod ws28xx {
     }
 
     pub struct LogicalStrip<'a> {
-        color_buffer: &'a mut [c::Color],
-        strips: &'a [PhysicalStrip],
+        pub color_buffer: &'a mut [c::Color],
+        pub strips: &'a [PhysicalStrip],
     }
 
     impl<'a> LogicalStrip<'a> {
@@ -118,36 +118,7 @@ pub mod ws28xx {
             }
         }
 
-        // this will iterate over all the strips and send the led data in series:
-        pub fn send_all_sequential<T>(&self, hc: &mut HardwareController<T>)
-        where
-            T: PeriodicTimer,
-        {
-            let mut start_index = 0;
-
-            for (pin_index, strip) in self.strips.iter().enumerate() {
-                let end_index = start_index + strip.led_count;
-
-                let current_strip_colors = &self.color_buffer[start_index..end_index];
-
-                let byte_count = strip.led_count * 3;
-
-                let byte_buffer = match strip.reversed {
-                    true => {
-                        self.colors_to_bytes(current_strip_colors.iter().rev(), &strip.color_order)
-                    }
-                    false => self.colors_to_bytes(current_strip_colors.iter(), &strip.color_order),
-                };
-
-                let bit_slice = Self::bytes_as_bit_slice(&byte_buffer[..byte_count]);
-
-                strip.send_bits(hc, pin_index, bit_slice.iter().by_ref());
-
-                start_index = end_index;
-            }
-        }
-
-        fn colors_to_bytes(
+        pub fn colors_to_bytes(
             &self,
             colors: impl Iterator<Item = &'a c::Color>,
             color_order: &ColorOrder,
@@ -168,7 +139,7 @@ pub mod ws28xx {
         }
 
         // this takes an array of u8 color data and converts it into an array of bools
-        fn bytes_as_bit_slice(byte_buffer: &[u8]) -> &BitSlice<Msb0, u8> {
+        pub fn bytes_as_bit_slice(byte_buffer: &[u8]) -> &BitSlice<Msb0, u8> {
             byte_buffer.view_bits::<Msb0>()
         }
     }

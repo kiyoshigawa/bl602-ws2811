@@ -190,6 +190,7 @@ fn main() -> ! {
         fade_in_time_ns: 250_000_000,
         fade_out_time_ns: 750_000_000,
         starting_offset: 0,
+        pixels_per_pixel_group: 1,
     };
 
     // let mut i = 0_u16;

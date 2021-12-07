@@ -113,8 +113,8 @@ pub const fn dark_pattern(base: Color) -> [Color; 6] {
     let mut colors = [C_OFF; 6];
     let mut i = 0;
     while i < 3 {
-        colors[i*2] = Color { r: base.r/2, g: base.g/2, b: base.b/2 };
-        colors[i*2+1] = Color { r: base.r/4, g: base.g/4, b: base.b/4 };
+        colors[i * 2] = Color { r: base.r / 2, g: base.g / 2, b: base.b / 2 };
+        colors[i * 2 + 1] = Color { r: base.r / 4, g: base.g / 4, b: base.b / 4 };
         i += 1;
     }
     colors
@@ -127,46 +127,45 @@ pub const R_DARK_SKY_BLUE_PATTERN: Rainbow = &dark_pattern(C_SKY_BLUE);
 pub const R_DARK_BLUE_PATTERN: Rainbow = &dark_pattern(C_BLUE);
 pub const R_DARK_PURPLE_PATTERN: Rainbow = &dark_pattern(C_PURPLE);
 pub const R_WHITE_PATTERN: Rainbow = &dark_pattern(C_WHITE);
-pub const R_VU_METER: Rainbow =
-    &[
-        C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_YELLOW, C_YELLOW, C_RED,
-    ];
+pub const R_VU_METER: Rainbow = &[
+    C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_YELLOW, C_YELLOW, C_RED,
+];
 
 pub const NUM_RAINBOWS: usize = 31;
 
 /// This is an array of the rainbow consts above that can be used to cycle through rainbows in animations.
 pub const RAINBOW_ARRAY: [&[Color]; NUM_RAINBOWS] = [
-    &R_OFF,
-    &R_ON,
-    &R_RED,
-    &R_ORANGE,
-    &R_YELLOW,
-    &R_YELLOW_GREEN,
-    &R_GREEN,
-    &R_GREEN_BLUE,
-    &R_SKY_BLUE,
-    &R_DEEP_BLUE,
-    &R_BLUE,
-    &R_BLUE_PURPLE,
-    &R_PURPLE,
-    &R_DARK_PURPLE,
-    &R_ROYGBIV,
-    &R_RYB,
-    &R_OGP,
-    &R_RGB,
-    &R_BY,
-    &R_RB,
-    &R_OB,
-    &R_BW,
-    &R_RW,
-    &R_GW,
-    &R_DARK_RED_PATTERN,
-    &R_DARK_YELLOW_PATTERN,
-    &R_DARK_GREEN_PATTERN,
-    &R_DARK_SKY_BLUE_PATTERN,
-    &R_DARK_BLUE_PATTERN,
-    &R_DARK_PURPLE_PATTERN,
-    &R_WHITE_PATTERN,
+    R_OFF,
+    R_ON,
+    R_RED,
+    R_ORANGE,
+    R_YELLOW,
+    R_YELLOW_GREEN,
+    R_GREEN,
+    R_GREEN_BLUE,
+    R_SKY_BLUE,
+    R_DEEP_BLUE,
+    R_BLUE,
+    R_BLUE_PURPLE,
+    R_PURPLE,
+    R_DARK_PURPLE,
+    R_ROYGBIV,
+    R_RYB,
+    R_OGP,
+    R_RGB,
+    R_BY,
+    R_RB,
+    R_OB,
+    R_BW,
+    R_RW,
+    R_GW,
+    R_DARK_RED_PATTERN,
+    R_DARK_YELLOW_PATTERN,
+    R_DARK_GREEN_PATTERN,
+    R_DARK_SKY_BLUE_PATTERN,
+    R_DARK_BLUE_PATTERN,
+    R_DARK_PURPLE_PATTERN,
+    R_WHITE_PATTERN,
 ];
 
 /// A color correction table for LEDs to make them look like the color you expect:

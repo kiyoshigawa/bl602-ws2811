@@ -862,16 +862,37 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
 pub struct Progression {
     pub current: u32,
     pub total: u32,
+    pub is_forward: bool,
 }
 
 impl Progression {
     pub fn new(total: u32) -> Self {
-        Self { current: 0, total }
+        Self { current: 0, total, is_forward: true }
+    }
+
+    pub fn reverse_direction(&mut self) {
+        self.is_forward = !self.is_forward;
+    }
+
+    pub fn decrement(&mut self) {
+        if self.total == 0 { return; }
+        match self.is_forward {
+            true => self.current = self.down_one(),
+            false => self.current = self.up_one(),
+        }
+    }
+
+    pub fn checked_decrement(&mut self) -> bool {
+        self.decrement();
+        self.current == self.total - 1
     }
 
     pub fn increment(&mut self) {
         if self.total == 0 { return; }
-        self.current = self.next();
+        match self.is_forward {
+            true => self.current = self.up_one(),
+            false => self.current = self.down_one(),
+        }
     }
 
     pub fn checked_increment(&mut self) -> bool {
@@ -879,8 +900,28 @@ impl Progression {
         self.current == 0
     }
 
-    pub fn next(&self) -> u32 {
+    pub fn peek_next(&self) -> u32 {
+        match self.is_forward {
+            true => self.up_one(),
+            false => self.down_one(),
+        }
+    }
+
+    pub fn peek_prev(&self) -> u32 {
+        match self.is_forward {
+            true => self.down_one(),
+            false => self.up_one(),
+        }
+    }
+
+    pub fn up_one(&self) -> u32 {
+        if self.total == 0 { return 0; }
         (self.current + 1) % self.total
+    }
+
+    pub fn down_one(&self) -> u32 {
+        if self.total == 0 { return 0; }
+        (self.current + self.total -1 ) % self.total
     }
 
     pub fn reset(&mut self) {

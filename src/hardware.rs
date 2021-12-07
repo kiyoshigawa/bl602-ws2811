@@ -1,4 +1,4 @@
-use crate::NUM_STRIPS;
+use crate::{NUM_STRIPS, leds::ws28xx::LogicalStrip};
 use bl602_hal::timer::{ConfiguredTimerChannel0, ConfiguredTimerChannel1, Preload};
 use core::convert::Infallible;
 use embedded_hal::digital::blocking::OutputPin;
@@ -36,6 +36,33 @@ where
 
     pub fn periodic_wait(&mut self) {
         self.timer.periodic_wait();
+    }
+
+    /// this will iterate over all the strips and send the led data in series:
+    pub fn send_all_sequential(&mut self, logical_strip: &mut LogicalStrip)
+    {
+        let mut start_index = 0;
+
+        for (pin_index, strip) in logical_strip.strips.iter().enumerate() {
+            let end_index = start_index + strip.led_count;
+
+            let current_strip_colors = &logical_strip.color_buffer[start_index..end_index];
+
+            let byte_count = strip.led_count * 3;
+
+            let byte_buffer = match strip.reversed {
+                true => {
+                    logical_strip.colors_to_bytes(current_strip_colors.iter().rev(), &strip.color_order)
+                }
+                false => logical_strip.colors_to_bytes(current_strip_colors.iter(), &strip.color_order),
+            };
+
+            let bit_slice = LogicalStrip::bytes_as_bit_slice(&byte_buffer[..byte_count]);
+
+            strip.send_bits(self, pin_index, bit_slice.iter().by_ref());
+
+            start_index = end_index;
+        }
     }
 }
 

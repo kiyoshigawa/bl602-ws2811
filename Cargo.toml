@@ -8,7 +8,7 @@ edition = "2021"
 riscv-rt = "0.8.0"
 embedded-hal = "=1.0.0-alpha.5"
 # Only using the local copy while I am working on updating the timers in the hal:
-bl602-hal = { path = "../bl602-hal" }
+bl602-hal = { git = "https://github.com/kiyoshigawa/bl602-hal" }
 panic-halt = "0.2.0"
 riscv = "0.7.0"
 embedded-time = "0.12.0"

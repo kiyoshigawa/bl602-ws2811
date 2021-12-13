@@ -1,4 +1,4 @@
-use crate::colors as c;
+use crate::{colors as c, foreground};
 use crate::colors::Color;
 use crate::leds::ws28xx::LogicalStrip;
 use arrayvec::ArrayVec as Vec;
@@ -40,36 +40,6 @@ pub enum BackgroundMode {
     /// color pattern over time.
     /// When externally triggered, it moves to a random offset.
     FillRainbowRotate,
-}
-
-/// Foreground modes are rendered second, and will animate over the background animation layer but
-/// below the trigger animations. Any trigger animations will overwrite the pixel data from the
-/// foreground that is effected by their animation.
-pub enum ForegroundMode {
-    /// This is a mode that has no additional foreground animation over the background animation.
-    NoForeground,
-
-    /// This will display a single-color marquee style pixel chase animation using rainbow
-    /// colors. The foreground trigger will advance to the next color of the rainbow.
-    MarqueeSolid,
-
-    /// This will display a fixed pattern the same as a marquee chase animation that will only
-    /// move if the offset is changed manually where the color is always a solid constant color.
-    /// The foreground trigger will advance to the next color of the rainbow.
-    MarqueeSolidFixed,
-
-    /// This will display a marquee style animation where the color of all the LEDs slowly fades
-    /// through the colors of a rainbow. It will advance to the next color if externally triggered.
-    MarqueeFade,
-
-    /// This will display a fixed pattern the same as a marquee chase animation that will only move
-    /// if the offset is changed manually where the color of all the LEDs slowly fades through the
-    /// colors of a rainbow. It will advance to the next color if externally triggered.
-    MarqueeFadeFixed,
-
-    /// This will render the foreground rainbow based on the offset value, and leave LEDs below
-    /// the offset value alone.
-    VUMeter,
 }
 
 /// These are the types of triggered animation effects that are possible with an animation. They can
@@ -157,7 +127,7 @@ pub enum AnimationType {
 /// information for trigger animations (such as the trigger Rainbow)
 pub struct AnimationParameters<'a> {
     pub bg: AnimationBackgroundParameters<'a>,
-    pub fg: AnimationForegroundParameters<'a>,
+    pub fg: foreground::Parameters<'a>,
     pub trigger: AnimationGlobalTriggerParameters<'a>,
 }
 
@@ -167,28 +137,17 @@ pub struct AnimationBackgroundParameters<'a> {
     pub mode: BackgroundMode,
     pub rainbow: c::Rainbow<'a>,
     pub direction: Direction,
-    pub is_rainbow_reversed: bool,
+    pub is_rainbow_forward: bool,
     pub duration_ns: u64,
     pub subdivisions: usize,
 }
 
-/// This contains all the information necessary to set up and run a foreground animation. All
-/// aspects of the animation can be derived from these parameters.
-pub struct AnimationForegroundParameters<'a> {
-    pub mode: ForegroundMode,
-    pub rainbow: c::Rainbow<'a>,
-    pub direction: Direction,
-    pub is_rainbow_reversed: bool,
-    pub duration_ns: u64,
-    pub step_time_ns: u64,
-    pub subdivisions: usize,
-    pub pixels_per_pixel_group: usize,
-}
+
 
 /// All triggers share a single rainbow / slow fade speed, which is configured in this struct
 pub struct AnimationGlobalTriggerParameters<'a> {
     pub rainbow: c::Rainbow<'a>,
-    pub is_rainbow_reversed: bool,
+    pub is_rainbow_forward: bool,
     pub duration_ns: u64,
 }
 
@@ -292,8 +251,8 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
         let init_color_pulse_trigger = |color| AnimationTriggerState {
             mode: params.mode,
             current_frame: 0,
-            total_fade_in_frames: Self::convert_ns_to_frames(params.fade_in_time_ns, frame_rate),
-            total_fade_out_frames: Self::convert_ns_to_frames(params.fade_out_time_ns, frame_rate),
+            total_fade_in_frames: convert_ns_to_frames(params.fade_in_time_ns, frame_rate),
+            total_fade_out_frames: convert_ns_to_frames(params.fade_out_time_ns, frame_rate),
             direction: Direction::Stopped,
             current_offset: random_offset,
             color,
@@ -301,7 +260,7 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
         let init_color_shot_trigger = |color| AnimationTriggerState {
             mode: params.mode,
             current_frame: 0,
-            total_fade_in_frames: Self::convert_ns_to_frames(params.step_time_ns, frame_rate),
+            total_fade_in_frames: convert_ns_to_frames(params.step_time_ns, frame_rate),
             total_fade_out_frames: 0, // not used with color shots, fade in represents step duration
             direction: params.direction,
             current_offset: starting_color_offset,
@@ -310,8 +269,8 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
         let init_flash_trigger = |color| AnimationTriggerState {
             mode: params.mode,
             current_frame: 0,
-            total_fade_in_frames: Self::convert_ns_to_frames(params.fade_in_time_ns, frame_rate),
-            total_fade_out_frames: Self::convert_ns_to_frames(params.fade_out_time_ns, frame_rate),
+            total_fade_in_frames: convert_ns_to_frames(params.fade_in_time_ns, frame_rate),
+            total_fade_out_frames: convert_ns_to_frames(params.fade_out_time_ns, frame_rate),
             direction: Direction::Stopped,
             current_offset: 0,
             color,
@@ -368,18 +327,18 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
 
     fn init_total_animation_duration_frames(&mut self, frame_rate: Hertz) {
         self.bg_state.frames.total =
-            Self::convert_ns_to_frames(self.parameters.bg.duration_ns, frame_rate);
+            convert_ns_to_frames(self.parameters.bg.duration_ns, frame_rate);
         self.fg_state.frames.total =
-            Self::convert_ns_to_frames(self.parameters.fg.duration_ns, frame_rate);
+            convert_ns_to_frames(self.parameters.fg.duration_ns, frame_rate);
         self.trigger_state.frames.total =
-            Self::convert_ns_to_frames(self.parameters.trigger.duration_ns, frame_rate);
+            convert_ns_to_frames(self.parameters.trigger.duration_ns, frame_rate);
     }
 
     fn init_total_animation_step_frames(&mut self, frame_rate: Hertz) {
         // Background animations don't use steps, this can be set to 0 and ignored:
         self.bg_state.step_frames.total = 0;
         self.fg_state.step_frames.total =
-            Self::convert_ns_to_frames(self.parameters.fg.step_time_ns, frame_rate);
+            convert_ns_to_frames(self.parameters.fg.step_time_ns, frame_rate);
     }
 }
 
@@ -426,12 +385,12 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
 
     fn update_fg(&mut self, logical_strip: &mut LogicalStrip) {
         match self.parameters.fg.mode {
-            ForegroundMode::NoForeground => self.update_fg_no_foreground(logical_strip),
-            ForegroundMode::MarqueeSolid => self.update_fg_marquee_solid(logical_strip),
-            ForegroundMode::MarqueeSolidFixed => self.update_fg_marquee_solid_fixed(logical_strip),
-            ForegroundMode::MarqueeFade => self.update_fg_marquee_fade(logical_strip),
-            ForegroundMode::MarqueeFadeFixed => self.update_fg_marquee_fade_fixed(logical_strip),
-            ForegroundMode::VUMeter => self.update_fg_vu_meter(logical_strip),
+            foreground::Mode::NoForeground => self.update_fg_no_foreground(logical_strip),
+            foreground::Mode::MarqueeSolid => self.update_fg_marquee_solid(logical_strip),
+            foreground::Mode::MarqueeSolidFixed => self.update_fg_marquee_solid_fixed(logical_strip),
+            foreground::Mode::MarqueeFade => self.update_fg_marquee_fade(logical_strip),
+            foreground::Mode::MarqueeFadeFixed => self.update_fg_marquee_fade_fixed(logical_strip),
+            foreground::Mode::VUMeter => self.update_fg_vu_meter(logical_strip),
         }
     }
 
@@ -497,7 +456,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
     fn next_rainbow_index(&mut self, ani_type: AnimationType) -> usize {
         match ani_type {
             AnimationType::Background => {
-                let increment: i32 = match self.parameters.bg.is_rainbow_reversed {
+                let increment: i32 = match self.parameters.bg.is_rainbow_forward {
                     true => 1,
                     false => -1,
                 };
@@ -507,7 +466,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
                     % bg_length
             }
             AnimationType::Foreground => {
-                let increment: i32 = match self.parameters.fg.is_rainbow_reversed {
+                let increment: i32 = match self.parameters.fg.is_rainbow_forward {
                     true => 1,
                     false => -1,
                 };
@@ -517,7 +476,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
                     % fg_length
             }
             AnimationType::Trigger => {
-                let increment: i32 = match self.parameters.trigger.is_rainbow_reversed {
+                let increment: i32 = match self.parameters.trigger.is_rainbow_forward {
                     true => 1,
                     false => -1,
                 };
@@ -846,12 +805,11 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
             self.triggers.remove(trigger_index);
         }
     }
+}
 
-    // Misc:
-
-    fn convert_ns_to_frames(nanos: u64, frame_rate: Hertz) -> u32 {
-        (nanos * frame_rate.integer() as u64 / 1_000_000_000_u64) as u32
-    }
+// Misc:
+pub fn convert_ns_to_frames(nanos: u64, frame_rate: Hertz) -> u32 {
+    (nanos * frame_rate.integer() as u64 / 1_000_000_000_u64) as u32
 }
 
 #[derive(Default, Debug, Copy, Clone)]

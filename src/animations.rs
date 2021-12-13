@@ -391,6 +391,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
             foreground::Mode::MarqueeFade => self.update_fg_marquee_fade(logical_strip),
             foreground::Mode::MarqueeFadeFixed => self.update_fg_marquee_fade_fixed(logical_strip),
             foreground::Mode::VUMeter => self.update_fg_vu_meter(logical_strip),
+            foreground::Mode::Custom(_) => todo!(),
         }
     }
 

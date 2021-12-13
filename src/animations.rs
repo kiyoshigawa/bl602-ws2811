@@ -171,10 +171,8 @@ pub struct AnimationTriggerParameters {
 struct AnimationState {
     offset: u16,
     frames: Progression,
-    step_frames: Progression,
     current_rainbow_color_index: usize,
     has_been_triggered: bool,
-    marquee_position_toggle: bool,
 }
 
 /// This contains the variables that apply to all triggers simultaneously, and not just to
@@ -205,7 +203,8 @@ pub struct Animation<'a, const N_LED: usize> {
     parameters: AnimationParameters<'a>,
     translation_array: [usize; N_LED],
     led_position_array: [u16; N_LED],
-    fg_state: AnimationState,
+    segment: [Color; N_LED],
+    fg_state: foreground::Foreground<'a>,
     bg_state: AnimationState,
     trigger_state: AnimationGlobalTriggerState,
     triggers: Vec<AnimationTriggerState, MAX_NUM_ACTIVE_TRIGGERS>,
@@ -217,7 +216,6 @@ pub trait Animatable<'a> {
     fn set_offset(&mut self, a_type: AnimationType, offset: u16);
     fn trigger(&mut self, params: &AnimationTriggerParameters, frame_rate: Hertz);
     fn init_total_animation_duration_frames(&mut self, frame_rate: Hertz);
-    fn init_total_animation_step_frames(&mut self, frame_rate: Hertz);
 }
 
 impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
@@ -225,7 +223,7 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
         // Update BG:
         self.update_bg(logical_strip);
         // Update FG:
-        self.update_fg(logical_strip);
+        self.fg_state.update(&mut self.segment);
         // Update Triggers:
         self.update_triggers(logical_strip);
     }
@@ -236,7 +234,7 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
                 self.bg_state.offset = offset;
             }
             AnimationType::Foreground => {
-                self.fg_state.offset = offset;
+                self.fg_state.base_state.offset = offset;
             }
             AnimationType::Trigger => {
                 // Triggers don't use offsets, so do nothing until they need to.
@@ -285,7 +283,7 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
                 None
             }
             Foreground => {
-                self.fg_state.has_been_triggered = true;
+                self.fg_state.base_state.has_been_triggered = true;
                 None
             }
             ColorPulse => {
@@ -328,17 +326,8 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
     fn init_total_animation_duration_frames(&mut self, frame_rate: Hertz) {
         self.bg_state.frames.total =
             convert_ns_to_frames(self.parameters.bg.duration_ns, frame_rate);
-        self.fg_state.frames.total =
-            convert_ns_to_frames(self.parameters.fg.duration_ns, frame_rate);
         self.trigger_state.frames.total =
             convert_ns_to_frames(self.parameters.trigger.duration_ns, frame_rate);
-    }
-
-    fn init_total_animation_step_frames(&mut self, frame_rate: Hertz) {
-        // Background animations don't use steps, this can be set to 0 and ignored:
-        self.bg_state.step_frames.total = 0;
-        self.fg_state.step_frames.total =
-            convert_ns_to_frames(self.parameters.fg.step_time_ns, frame_rate);
     }
 }
 
@@ -347,7 +336,9 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
 
     pub fn new(
         parameters: AnimationParameters<'a>,
+        fg_parameters: foreground::Parameters<'a>,
         translation_array: [usize; N_LED],
+        frame_rate: Hertz,
         random_seed: u64,
     ) -> Self {
         // Generate the LED Position Array. This is constant for every Animation based on the
@@ -360,12 +351,15 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
             *led = current_led_offset;
             current_led_offset += Self::OFFSET_BETWEEN_LEDS;
         }
+        let segment = [Color::default(); N_LED];
+        let fg_state = foreground::Foreground::new(fg_parameters, frame_rate);
         let random_number_generator = SmallRng::seed_from_u64(random_seed);
         Animation {
             parameters,
             translation_array,
             led_position_array,
-            fg_state: AnimationState::default(),
+            segment,
+            fg_state,
             bg_state: AnimationState::default(),
             trigger_state: AnimationGlobalTriggerState::default(),
             triggers: Vec::new(),
@@ -380,18 +374,6 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
             BackgroundMode::SolidFade => self.update_bg_solid_fade(logical_strip),
             BackgroundMode::FillRainbow => self.update_bg_fill_rainbow(logical_strip),
             BackgroundMode::FillRainbowRotate => self.update_bg_fill_rainbow_rotate(logical_strip),
-        }
-    }
-
-    fn update_fg(&mut self, logical_strip: &mut LogicalStrip) {
-        match self.parameters.fg.mode {
-            foreground::Mode::NoForeground => self.update_fg_no_foreground(logical_strip),
-            foreground::Mode::MarqueeSolid => self.update_fg_marquee_solid(logical_strip),
-            foreground::Mode::MarqueeSolidFixed => self.update_fg_marquee_solid_fixed(logical_strip),
-            foreground::Mode::MarqueeFade => self.update_fg_marquee_fade(logical_strip),
-            foreground::Mode::MarqueeFadeFixed => self.update_fg_marquee_fade_fixed(logical_strip),
-            foreground::Mode::VUMeter => self.update_fg_vu_meter(logical_strip),
-            foreground::Mode::Custom(_) => todo!(),
         }
     }
 
@@ -419,20 +401,11 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
         }
     }
 
-    fn increment_marquee_step(&mut self) {
-        // Increment and check to see if the color rolls over:
-        let did_roll = self.fg_state.step_frames.checked_increment();
-        if did_roll {
-            // toggle whether even or odd sub-pips are showing the marquee color:
-            self.fg_state.marquee_position_toggle = !self.fg_state.marquee_position_toggle;
-        }
-    }
-
     // Slow Fade Intermediate Color Calculators:
     fn calculate_slow_fade_color(&mut self, anim_type: AnimationType) -> Color {
         let frames = match anim_type {
             AnimationType::Background => &mut self.bg_state.frames,
-            AnimationType::Foreground => &mut self.fg_state.frames,
+            AnimationType::Foreground => &mut self.fg_state.base_state.frames,
             AnimationType::Trigger => &mut self.trigger_state.frames,
         };
 
@@ -467,14 +440,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
                     % bg_length
             }
             AnimationType::Foreground => {
-                let increment: i32 = match self.parameters.fg.is_rainbow_forward {
-                    true => 1,
-                    false => -1,
-                };
-                let fg_length = self.parameters.fg.rainbow.len();
-                (self.fg_state.current_rainbow_color_index as i32 + fg_length as i32 + increment)
-                    as usize
-                    % fg_length
+                self.fg_state.base_state.rainbow.position.peek_next() as usize
             }
             AnimationType::Trigger => {
                 let increment: i32 = match self.parameters.trigger.is_rainbow_forward {
@@ -496,7 +462,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
                 self.parameters.bg.rainbow[self.bg_state.current_rainbow_color_index]
             }
             AnimationType::Foreground => {
-                self.parameters.fg.rainbow[self.fg_state.current_rainbow_color_index]
+                self.fg_state.current_rainbow_color()
             }
             AnimationType::Trigger => {
                 self.parameters.trigger.rainbow[self.trigger_state.current_rainbow_color_index]
@@ -510,7 +476,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
                 self.parameters.bg.rainbow[self.next_rainbow_index(ani_type)]
             }
             AnimationType::Foreground => {
-                self.parameters.fg.rainbow[self.next_rainbow_index(ani_type)]
+                self.fg_state.base_state.rainbow.peek_next_color()
             }
             AnimationType::Trigger => {
                 self.parameters.trigger.rainbow[self.next_rainbow_index(ani_type)]
@@ -528,11 +494,7 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
                 }
             }
             AnimationType::Foreground => {
-                if !self.parameters.fg.rainbow.is_empty() {
-                    self.fg_state.current_rainbow_color_index = self.next_rainbow_index(ani_type);
-                } else {
-                    self.fg_state.current_rainbow_color_index = 0;
-                }
+                self.fg_state.advance_rainbow_index();
             }
             AnimationType::Trigger => {
                 if !self.parameters.trigger.rainbow.is_empty() {
@@ -602,25 +564,6 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
         }
     }
 
-    fn fill_marquee(&mut self, color: c::Color, logical_strip: &mut LogicalStrip) {
-        for led_index in 0..N_LED {
-            // every time the index is evenly divisible by the number of subpixels, toggle the state
-            // that the pixels should be set to:
-            let subpip_number = led_index % (self.parameters.fg.pixels_per_pixel_group * 2);
-
-            if subpip_number < self.parameters.fg.pixels_per_pixel_group
-                && self.fg_state.marquee_position_toggle
-            {
-                logical_strip.set_color_at_index(self.translation_array[led_index], color);
-            }
-            if subpip_number >= self.parameters.fg.pixels_per_pixel_group
-                && !self.fg_state.marquee_position_toggle
-            {
-                logical_strip.set_color_at_index(self.translation_array[led_index], color);
-            }
-        }
-    }
-
     // Backgrounds:
 
     fn update_bg_no_background(&mut self, logical_strip: &mut LogicalStrip) {
@@ -685,70 +628,6 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
         color_start_offset %= MAX_OFFSET;
 
         self.fill_rainbow(color_start_offset, self.parameters.bg.rainbow, logical_strip);
-    }
-
-    // Foregrounds:
-
-    fn update_fg_no_foreground(&mut self, _: &mut LogicalStrip) {
-        // Do Nothing
-    }
-
-    fn update_fg_marquee_solid(&mut self, logical_strip: &mut LogicalStrip) {
-        if self.fg_state.has_been_triggered {
-            self.advance_rainbow_index(AnimationType::Foreground);
-            self.fg_state.has_been_triggered = false;
-        }
-        let color = self.current_rainbow_color(AnimationType::Foreground);
-        self.increment_marquee_step();
-        self.fill_marquee(color, logical_strip);
-    }
-
-    fn update_fg_marquee_solid_fixed(&mut self, logical_strip: &mut LogicalStrip) {
-        if self.fg_state.has_been_triggered {
-            self.advance_rainbow_index(AnimationType::Foreground);
-            self.fg_state.has_been_triggered = false;
-        }
-
-        // calculate the marquee_position_toggle based on the set offset value:
-        let pip_distance =
-            (MAX_OFFSET as usize / N_LED) * self.parameters.fg.pixels_per_pixel_group.max(1);
-        let led_bucket = self.fg_state.offset as usize / pip_distance.max(1);
-        self.fg_state.marquee_position_toggle = led_bucket % 2 == 0;
-
-        let color = self.current_rainbow_color(AnimationType::Foreground);
-        self.fill_marquee(color, logical_strip);
-    }
-
-    fn update_fg_marquee_fade(&mut self, logical_strip: &mut LogicalStrip) {
-        if self.fg_state.has_been_triggered {
-            self.advance_rainbow_index(AnimationType::Foreground);
-            self.fg_state.frames.current = 0;
-            self.fg_state.has_been_triggered = false;
-        }
-        self.increment_marquee_step();
-        let intermediate_color = self.calculate_slow_fade_color(AnimationType::Foreground);
-        self.fill_marquee(intermediate_color, logical_strip);
-    }
-
-    fn update_fg_marquee_fade_fixed(&mut self, logical_strip: &mut LogicalStrip) {
-        if self.fg_state.has_been_triggered {
-            self.advance_rainbow_index(AnimationType::Foreground);
-            self.fg_state.frames.current = 0;
-            self.fg_state.has_been_triggered = false;
-        }
-
-        // calculate the marquee_position_toggle based on the set offset value:
-        let pip_distance =
-            (MAX_OFFSET as usize / N_LED) * self.parameters.fg.pixels_per_pixel_group.max(1);
-        let led_bucket = self.fg_state.offset as usize / pip_distance.max(1);
-        self.fg_state.marquee_position_toggle = led_bucket % 2 == 0;
-
-        let intermediate_color = self.calculate_slow_fade_color(AnimationType::Foreground);
-        self.fill_marquee(intermediate_color, logical_strip);
-    }
-
-    fn update_fg_vu_meter(&mut self, logical_strip: &mut LogicalStrip) {
-        // TODO
     }
 
     // Triggers:
@@ -880,7 +759,10 @@ impl Progression {
     }
 
     pub fn reset(&mut self) {
-        self.current = 0;
+        self.current = match self.is_forward {
+            true => 0,
+            false => self.total - 1,
+        }
     }
 }
 

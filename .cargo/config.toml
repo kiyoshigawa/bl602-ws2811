@@ -4,7 +4,7 @@ rustflags = [
   "-C", "link-arg=-Tlink.x",
   "-C", "link-arg=-Thal_defaults.x",
 ]
-runner = "cargo blflash --port=COM14"
+runner = "blash --port COM7 --monitor-baud 2000000 --"
 
 [build]
 target = "riscv32imac-unknown-none-elf"

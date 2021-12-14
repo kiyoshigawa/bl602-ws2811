@@ -1,10 +1,10 @@
-use embedded_time::rate::Hertz;
 use crate::{
-    animations as a,
     a::MAX_OFFSET,
+    animations as a,
     animations::{Direction, Progression},
-    c::{Color, Rainbow},
+    c::{self, Color, Rainbow},
 };
+use embedded_time::rate::Hertz;
 
 type FgUpdater = fn(&mut Foreground, &mut [Color]);
 
@@ -98,7 +98,11 @@ fn marquee_fade_fixed(fg: &mut Foreground, segment: &mut [Color]) {
 
 fn vu_meter(fg: &mut Foreground, segment: &mut [Color]) {
     fg.current_rainbow_color();
-    todo!()
+    let led_count = segment.len();
+    let last_on_led = fg.base_state.offset as usize / led_count;
+    for led in segment[last_on_led..].iter_mut() {
+        *led = c::C_OFF;
+    }
 }
 
 fn set_marquee_toggle(fg: &mut Foreground, led_count: usize) {

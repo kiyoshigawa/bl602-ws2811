@@ -27,7 +27,8 @@ use hal::{
     serial::*,
     timer::*,
 };
-use panic_halt as _;
+use panic_write as _;
+use panic_write::PanicHandler;
 
 // How many LEDs on each wall:
 const NUM_LEDS_SOUTH_WALL: usize = 34;
@@ -143,6 +144,7 @@ fn main() -> ! {
         clocks,
     );
 
+    let mut serial = PanicHandler::new(serial);
     writeln!(serial, "Debug Serial Initialized...\r").ok();
 
     let mut color_buffer: [c::Color; NUM_LEDS] = [c::Color::default(); NUM_LEDS];

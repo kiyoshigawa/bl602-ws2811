@@ -7,6 +7,10 @@ pub mod default_animations;
 pub mod hardware;
 pub mod leds;
 pub mod lighting_controller;
+pub mod foreground;
+pub mod background;
+pub mod trigger;
+pub mod utility;
 
 use crate::animations as a;
 use crate::colors as c;

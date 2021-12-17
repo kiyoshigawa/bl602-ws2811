@@ -1,9 +1,4 @@
-use crate::{
-    a::MAX_OFFSET,
-    animations as a,
-    animations::{Direction, Progression},
-    c::{self, Color, Rainbow},
-};
+use crate::{a::MAX_OFFSET, animations as a, animations::{Direction}, c::{self, Color, Rainbow}, utility::{Progression, StatefulRainbow, convert_ns_to_frames}};
 use embedded_time::rate::Hertz;
 
 type FgUpdater = fn(&mut Foreground, &mut [Color]);
@@ -89,7 +84,6 @@ fn marquee_fade(fg: &mut Foreground, segment: &mut [Color]) {
 }
 
 fn marquee_fade_fixed(fg: &mut Foreground, segment: &mut [Color]) {
-    fg.base_state.frames.increment();
     handle_marquee_trigger(fg);
     set_marquee_toggle(fg, segment.len());
     let color = fg.base_state.calculate_slow_fade_color();
@@ -116,58 +110,7 @@ fn handle_marquee_trigger(fg: &mut Foreground) {
     if fg.base_state.has_been_triggered {
         fg.advance_rainbow_index();
         fg.base_state.frames.reset();
-        fg.base_state.has_been_triggered = false;
-    }
-}
-
-
-pub struct StatefulRainbow<'a> {
-    pub backer: Rainbow<'a>,
-    pub position: Progression,
-}
-
-impl<'a> StatefulRainbow<'a> {
-    fn new(rainbow: &'a [Color], is_forward: bool) -> StatefulRainbow<'a> {
-        let mut position = Progression::new(rainbow.len() as u32);
-        if !is_forward {
-            position.current = position.total - 1;
-            position.reverse_direction();
-        }
-        Self { backer: rainbow, position }
-    }
-
-    pub fn current_color(&self) -> Color {
-        self.backer[self.position.current as usize]
-    }
-
-    fn decrement(&mut self) {
-        self.position.decrement();
-    }
-
-    pub fn increment(&mut self) {
-        self.position.increment();
-    }
-
-    fn prev_color(&mut self) -> Color {
-        self.increment();
-        self.current_color()
-    }
-
-    fn next_color(&mut self) -> Color {
-        self.increment();
-        self.current_color()
-    }
-
-    pub fn peek_next_color(&self) -> Color {
-        self.backer[self.position.peek_next() as usize]
-    }
-
-    pub fn peek_last_color(&self) -> Color {
-        self.backer[self.position.peek_prev() as usize]
-    }
-
-    pub fn reset(&mut self) {
-        self.position.reset();
+        fg.base_state.reset_trigger();
     }
 }
 
@@ -202,12 +145,12 @@ impl<'a> AnimationState<'a> {
             return self.rainbow.current_color();
         }
 
-        let did_roll = frames.checked_increment();
+        // let did_roll = frames.checked_increment();
         let progress = *frames;
 
-        if did_roll {
-            self.rainbow.position.increment();
-        }
+        // if did_roll {
+        //     self.rainbow.position.increment();
+        // }
 
         let current_color = self.rainbow.current_color();
         let next_color = self.rainbow.peek_next_color();
@@ -229,10 +172,10 @@ pub struct Foreground<'a> {
 }
 
 impl<'a> Foreground<'a> {
-    pub fn new(init: Parameters<'a>, frame_rate: Hertz) -> Self {
-        let frames = a::convert_ns_to_frames(init.duration_ns, frame_rate);
+    pub fn new(init: &Parameters<'a>, frame_rate: Hertz) -> Self {
+        let frames = convert_ns_to_frames(init.duration_ns, frame_rate);
         let base_state = AnimationState::new(init.rainbow, init.is_rainbow_forward, frames);
-        let step_frames = a::convert_ns_to_frames(init.step_time_ns, frame_rate);
+        let step_frames = convert_ns_to_frames(init.step_time_ns, frame_rate);
         let step_frames = Progression::new(step_frames);
         let updater = init.mode.get_updater();
 
@@ -251,6 +194,7 @@ impl<'a> Foreground<'a> {
         if let Some(f) = self.updater {
             f(self, segment);
         }
+        self.base_state.frames.increment();
     }
 
     pub fn current_rainbow_color(&self) -> Color {

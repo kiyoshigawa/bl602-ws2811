@@ -1,5 +1,5 @@
 use embedded_time::rate::Hertz;
-use crate::{a, a::{Direction, MAX_OFFSET}, c::{self, Color, Rainbow}, foreground::AnimationState};
+use crate::{a, a::{Direction, MAX_OFFSET}, c::{self, Color, Rainbow}, foreground::AnimationState, utility::convert_ns_to_frames};
 type BgUpdater = fn(&mut Background, &mut [Color]);
 
 /// Background Modes are rendered onto the animation LEDs first before any Foreground or Trigger
@@ -46,6 +46,9 @@ impl Mode {
     }
 }
 
+/// This contains all the information necessary to set up and run a background animation. All
+/// aspects of the animation can be derived from these parameters.
+
 pub struct Parameters<'a> {
     pub mode: Mode,
     pub rainbow: Rainbow<'a>,
@@ -66,8 +69,8 @@ pub struct Background<'a> {
 }
 
 impl<'a> Background<'a> {
-    pub fn new(init: Parameters<'a>, frame_rate: Hertz) -> Self {
-        let frames = a::convert_ns_to_frames(init.duration_ns, frame_rate);
+    pub fn new(init: &Parameters<'a>, frame_rate: Hertz) -> Self {
+        let frames = convert_ns_to_frames(init.duration_ns, frame_rate);
         let base_state = AnimationState::new(init.rainbow, init.is_rainbow_forward, frames);
 
         let updater = init.mode.get_updater();
@@ -84,6 +87,7 @@ impl<'a> Background<'a> {
         if let Some(f) = self.updater {
             f(self, segment);
         }
+        self.base_state.frames.increment();
     }
 
     pub fn current_rainbow_color(&self) -> Color {
@@ -107,6 +111,9 @@ impl<'a> Background<'a> {
         let start_offset = start_offset as usize;
         let max_offset = MAX_OFFSET as usize;
         let led_count = segment.len();
+        // Generate the LED Position. The LED positions are distributed evenly over
+        // the entire range from 0..MAX_OFFSET, to increase the effective supersampling resolution of
+        // the animation.
         let get_position = |led_index| led_index * (max_offset / led_count);
 
         // Always start with the first color of the rainbow:

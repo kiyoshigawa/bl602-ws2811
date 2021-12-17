@@ -1,4 +1,4 @@
-use crate::animations as a;
+use crate::{animations as a, trigger};
 use crate::animations::AnimationType;
 use crate::hardware::{HardwareController, PeriodicTimer};
 use crate::leds::ws28xx::LogicalStrip;
@@ -28,9 +28,9 @@ where
     ) -> Self {
         let frame_rate = frame_rate.into();
         let mut lc = LightingController { logical_strip, animations, frame_rate, timer };
-        for animation in lc.animations.iter_mut() {
-            animation.init_total_animation_duration_frames(lc.frame_rate);
-        }
+        // for animation in lc.animations.iter_mut() {
+        //     animation.init_total_animation_duration_frames(lc.frame_rate);
+        // }
         // calculate the period of the frame rate in nanoseconds
         let frame_period = 1_000_000_000_u64 / frame_rate.integer() as u64; // 1E9 Nanoseconds / Hz = Period in ns
 
@@ -43,13 +43,19 @@ where
         // Only update if it's been longer than the frame rate period since the last update:
         if self.timer.periodic_check_timeout().is_ok() {
             for animation in self.animations.iter_mut() {
-                animation.update(&mut self.logical_strip);
+                animation.update();
+                let segment = animation.segment();
+                let translater = animation.translation_array();
+                let translated = translater.iter().zip(segment.iter());
+                for (&index, &color) in translated {
+                    self.logical_strip.set_color_at_index(index, color);
+                }
             }
             self.logical_strip.send_all_sequential(hc);
         }
     }
 
-    pub fn trigger(&mut self, animation_index: usize, params: &a::AnimationTriggerParameters) {
+    pub fn trigger(&mut self, animation_index: usize, params: &trigger::Parameters) {
         self.animations[animation_index].trigger(params, self.frame_rate);
     }
 

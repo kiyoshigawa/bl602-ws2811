@@ -1,5 +1,14 @@
 use embedded_time::rate::Hertz;
-use crate::{a, a::{Direction, MAX_OFFSET}, c::{self, Color, Rainbow}, foreground::AnimationState, utility::convert_ns_to_frames};
+use crate::a::{Direction, MAX_OFFSET};
+use crate::c::{self, Color, Rainbow};
+use crate::utility::{
+    MarchingRainbow,
+    MarchingRainbowMut,
+    Progression,
+    StatefulRainbow,
+    convert_ns_to_frames,
+    get_random_offset,
+};
 type BgUpdater = fn(&mut Background, &mut [Color]);
 
 /// Background Modes are rendered onto the animation LEDs first before any Foreground or Trigger
@@ -46,9 +55,67 @@ impl Mode {
     }
 }
 
+/// Sets all LEDs to off
+fn no_background(bg: &mut Background, segment: &mut [Color]) {
+    bg.fill_solid(c::C_OFF, segment);
+}
+
+/// Sets all LEDs to the current rainbow color. Note that in this mode the color will only
+/// change when an external trigger of type `Background` is received.
+fn solid(bg: &mut Background, segment: &mut [Color]) {
+    handle_solid_trigger(bg);
+    bg.fill_solid(bg.current_rainbow_color(), segment);
+}
+
+fn solid_fade(bg: &mut Background, segment: &mut [Color]) {
+    handle_solid_trigger(bg);
+    for led in segment {
+        *led = bg.calculate_slow_fade_color();
+    }
+}
+
+/// Fills the rainbow based on whatever value the offset is currently set to:
+fn fill_rainbow(bg: &mut Background, segment: &mut [Color]) {
+    handle_rainbow_trigger(bg);
+    bg.fill_rainbow(bg.offset, bg.rainbow.backer, segment);
+}
+
+fn fill_rainbow_rotate(bg: &mut Background, segment: &mut [Color]) {
+    handle_rainbow_trigger(bg);
+
+    // This mode will take the value that the offset is set to and then adjust based on the
+    // current frame / total frames ratio to decide where to begin the rainbow. Need to do the
+    // addition of the set offset plus the frame offset as u32s to avoid going over u16::MAX,
+    // then modulo back to a u16 value using MAX_OFFSET when done.
+    let mut color_start_offset = bg.offset;
+
+    if bg.frames.total != 0 {
+        color_start_offset += (MAX_OFFSET as u32 * bg.frames.get_current()
+            / bg.frames.total) as u16;
+    }
+    color_start_offset %= MAX_OFFSET;
+
+    bg.fill_rainbow(color_start_offset, bg.rainbow.backer, segment);
+}
+
+/// Sets the background to a random offset then resets the trigger
+fn handle_rainbow_trigger(bg: &mut Background) {
+    if bg.has_been_triggered {
+        bg.offset = get_random_offset();
+        bg.reset_trigger();
+    }
+}
+
+/// Advances the rainbow which concurrently resets the frame count
+fn handle_solid_trigger(bg: &mut Background) {
+    if bg.has_been_triggered {
+        bg.advance_rainbow_color_hard();
+        bg.reset_trigger();
+    }
+}
+
 /// This contains all the information necessary to set up and run a background animation. All
 /// aspects of the animation can be derived from these parameters.
-
 pub struct Parameters<'a> {
     pub mode: Mode,
     pub rainbow: Rainbow<'a>,
@@ -60,9 +127,12 @@ pub struct Parameters<'a> {
 
 pub struct Background<'a> {
     // state
-    pub base_state: AnimationState<'a>,
+    pub offset: u16,
+    pub frames: Progression,
+    pub has_been_triggered: bool,
 
     // parameters
+    pub rainbow: StatefulRainbow<'a>,
     direction: Direction,
     subdivisions: usize,
     updater: Option<BgUpdater>,
@@ -70,16 +140,16 @@ pub struct Background<'a> {
 
 impl<'a> Background<'a> {
     pub fn new(init: &Parameters<'a>, frame_rate: Hertz) -> Self {
-        let frames = convert_ns_to_frames(init.duration_ns, frame_rate);
-        let base_state = AnimationState::new(init.rainbow, init.is_rainbow_forward, frames);
-
-        let updater = init.mode.get_updater();
+        let frame_count = convert_ns_to_frames(init.duration_ns, frame_rate);
 
         Self {
-            base_state,
+            offset: 0,
+            frames: Progression::new(frame_count),
+            has_been_triggered: false,
+            rainbow: StatefulRainbow::new(init.rainbow, init.is_rainbow_forward),
             direction: init.direction,
             subdivisions: init.subdivisions,
-            updater,
+            updater: init.mode.get_updater(),
         }
     }
 
@@ -87,15 +157,11 @@ impl<'a> Background<'a> {
         if let Some(f) = self.updater {
             f(self, segment);
         }
-        self.base_state.frames.increment();
+        self.frames.increment();
     }
 
-    pub fn current_rainbow_color(&self) -> Color {
-        self.base_state.rainbow.current_color()
-    }
-
-    pub fn advance_rainbow_index(&mut self) {
-        self.base_state.rainbow.position.increment();
+    pub fn reset_trigger(&mut self) {
+        self.has_been_triggered = false;
     }
 
     fn fill_solid(&mut self, color: Color, segment: &mut[Color]) {
@@ -117,7 +183,7 @@ impl<'a> Background<'a> {
         let get_position = |led_index| led_index * (max_offset / led_count);
 
         // Always start with the first color of the rainbow:
-        self.base_state.rainbow.reset();
+        self.rainbow.reset();
 
         let rainbow_length = rainbow.len();
 
@@ -162,65 +228,12 @@ impl<'a> Background<'a> {
 
 }
 
-fn get_random_offset() -> u16 {
-    // (self.random_number_generator.next_u32() % MAX_OFFSET as u32) as u16;
-    todo!()
+impl<'a> MarchingRainbow for Background<'a> {
+    fn rainbow(&self) -> &StatefulRainbow { &self.rainbow }
+    fn frames(&self) -> &Progression { &self.frames }
 }
 
-fn no_background(bg: &mut Background, segment: &mut [Color]) {
-    bg.fill_solid(c::C_OFF, segment);
-}
-
-fn solid(bg: &mut Background, segment: &mut [Color]) {
-    if bg.base_state.has_been_triggered {
-        bg.advance_rainbow_index();
-        bg.base_state.reset_trigger();
-    }
-    // Set all LEDs to the current rainbow color. Note that in this mode the color will only
-    // change when an external trigger of type `Background` is received.
-    bg.fill_solid(bg.current_rainbow_color(), segment);
-}
-
-fn solid_fade(bg: &mut Background, segment: &mut [Color]) {
-    if bg.base_state.has_been_triggered {
-        bg.advance_rainbow_index();
-        bg.base_state.frames.reset();
-        bg.base_state.reset_trigger();
-    }
-    for led in segment {
-        *led = bg.base_state.calculate_slow_fade_color();
-    }
-}
-
-fn fill_rainbow(bg: &mut Background, segment: &mut [Color]) {
-    // handle trigger condition:
-    if bg.base_state.has_been_triggered {
-        bg.base_state.offset = get_random_offset();
-        bg.base_state.reset_trigger();
-    }
-    // This mode only fills the rainbow to whatever value the offset is currently set to:
-    bg.fill_rainbow(bg.base_state.offset, bg.base_state.rainbow.backer, segment);
-}
-
-fn fill_rainbow_rotate(bg: &mut Background, segment: &mut [Color]) {
-    bg.base_state.rainbow.increment();
-    // handle trigger condition:
-    if bg.base_state.has_been_triggered {
-        bg.base_state.offset = get_random_offset();
-        bg.base_state.reset_trigger();
-    }
-
-    // This mode will take the value that the offset is set to and then adjust based on the
-    // current frame / total frames ratio to decide where to begin the rainbow. Need to do the
-    // addition of the set offset plus the frame offset as u32s to avoid going over u16::MAX,
-    // then modulo back to a u16 value using MAX_OFFSET when done.
-    let mut color_start_offset = bg.base_state.offset;
-
-    if bg.base_state.frames.total != 0 {
-        color_start_offset += (MAX_OFFSET as u32 * bg.base_state.frames.current
-            / bg.base_state.frames.total) as u16;
-    }
-    color_start_offset %= MAX_OFFSET;
-
-    bg.fill_rainbow(color_start_offset, bg.base_state.rainbow.backer, segment);
+impl<'a> MarchingRainbowMut for Background<'a> {
+    fn rainbow_mut(&mut self) -> &'a mut StatefulRainbow { &mut self.rainbow }
+    fn frames_mut(&mut self) -> &mut Progression { &mut self.frames }
 }

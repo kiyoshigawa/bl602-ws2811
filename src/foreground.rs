@@ -1,20 +1,7 @@
-use crate::{a::MAX_OFFSET, animations as a, animations::{Direction}, c::{self, Color, Rainbow}, utility::{Progression, StatefulRainbow, convert_ns_to_frames}};
+use crate::{a::MAX_OFFSET, animations::{Direction}, c::{self, Color, Rainbow}, utility::{MarchingRainbow, MarchingRainbowMut, Progression, StatefulRainbow, convert_ns_to_frames}};
 use embedded_time::rate::Hertz;
 
 type FgUpdater = fn(&mut Foreground, &mut [Color]);
-
-/// This contains all the information necessary to set up and run a foreground animation. All
-/// aspects of the animation can be derived from these parameters.
-pub struct Parameters<'a> {
-    pub mode: Mode,
-    pub rainbow: Rainbow<'a>,
-    pub direction: Direction,
-    pub is_rainbow_forward: bool,
-    pub duration_ns: u64,
-    pub step_time_ns: u64,
-    pub subdivisions: usize,
-    pub pixels_per_pixel_group: usize,
-}
 
 /// Foreground modes are rendered second, and will animate over the background animation layer but
 /// below the trigger animations. Any trigger animations will overwrite the pixel data from the
@@ -76,25 +63,24 @@ fn marquee_solid_fixed(fg: &mut Foreground, segment: &mut [Color]) {
 }
 
 fn marquee_fade(fg: &mut Foreground, segment: &mut [Color]) {
-    fg.base_state.frames.increment();
     handle_marquee_trigger(fg);
     fg.increment_marquee_step();
-    let color = fg.base_state.calculate_slow_fade_color();
+    let color = fg.calculate_slow_fade_color();
     fg.fill_marquee(color, segment);
 }
 
 fn marquee_fade_fixed(fg: &mut Foreground, segment: &mut [Color]) {
     handle_marquee_trigger(fg);
     set_marquee_toggle(fg, segment.len());
-    let color = fg.base_state.calculate_slow_fade_color();
+    let color = fg.calculate_slow_fade_color();
     fg.fill_marquee(color, segment);
 }
 
 fn vu_meter(fg: &mut Foreground, segment: &mut [Color]) {
     fg.current_rainbow_color();
     let led_count = segment.len();
-    let last_on_led = fg.base_state.offset as usize / led_count;
-    for led in segment[last_on_led..].iter_mut() {
+    let last_on_led = fg.offset as usize / led_count;
+    for led in &mut segment[last_on_led..] {
         *led = c::C_OFF;
     }
 }
@@ -102,69 +88,40 @@ fn vu_meter(fg: &mut Foreground, segment: &mut [Color]) {
 fn set_marquee_toggle(fg: &mut Foreground, led_count: usize) {
     let pip_distance =
         (MAX_OFFSET as usize / led_count) * fg.pixels_per_pixel_group.max(1);
-    let led_bucket = fg.base_state.offset as usize / pip_distance.max(1);
+    let led_bucket = fg.offset as usize / pip_distance.max(1);
     fg.marquee_position_toggle = led_bucket % 2 == 0;
 }
 
 fn handle_marquee_trigger(fg: &mut Foreground) {
-    if fg.base_state.has_been_triggered {
-        fg.advance_rainbow_index();
-        fg.base_state.frames.reset();
-        fg.base_state.reset_trigger();
+    if fg.has_been_triggered {
+        fg.advance_rainbow_color_hard();
+        fg.reset_trigger();
     }
 }
 
-pub struct AnimationState<'a> {
-    pub offset: u16,
-    pub frames: Progression,
-    pub rainbow: StatefulRainbow<'a>,
-    pub has_been_triggered: bool,
-}
-
-impl<'a> AnimationState<'a> {
-    pub fn new(rainbow: Rainbow<'a>, is_forward: bool, frame_count: u32) -> Self {
-        Self {
-            offset: 0,
-            frames: Progression::new(frame_count),
-            rainbow: StatefulRainbow::new(rainbow, is_forward),
-            has_been_triggered: false,
-        }
-    }
-
-    pub fn trigger(&mut self) {
-        self.has_been_triggered = true;
-    }
-
-    pub fn reset_trigger(&mut self) {
-        self.has_been_triggered = false;
-    }
-
-    pub fn calculate_slow_fade_color(&mut self) -> Color {
-        let frames = &mut self.frames;
-        if frames.total == 0 {
-            return self.rainbow.current_color();
-        }
-
-        // let did_roll = frames.checked_increment();
-        let progress = *frames;
-
-        // if did_roll {
-        //     self.rainbow.position.increment();
-        // }
-
-        let current_color = self.rainbow.current_color();
-        let next_color = self.rainbow.peek_next_color();
-        current_color.lerp_with(next_color, progress)
-    }
+/// This contains all the information necessary to set up and run a foreground animation. All
+/// aspects of the animation can be derived from these parameters.
+pub struct Parameters<'a> {
+    pub mode: Mode,
+    pub rainbow: Rainbow<'a>,
+    pub direction: Direction,
+    pub is_rainbow_forward: bool,
+    pub duration_ns: u64,
+    pub step_time_ns: u64,
+    pub subdivisions: usize,
+    pub pixels_per_pixel_group: usize,
 }
 
 pub struct Foreground<'a> {
     // state
-    pub base_state: AnimationState<'a>,
+    pub offset: u16,
+    pub frames: Progression,
     pub step_frames: Progression,
     marquee_position_toggle: bool,
+    pub has_been_triggered: bool,
 
     // parameters
+    pub rainbow: StatefulRainbow<'a>,
     direction: Direction,
     subdivisions: usize,
     pixels_per_pixel_group: usize,
@@ -173,20 +130,20 @@ pub struct Foreground<'a> {
 
 impl<'a> Foreground<'a> {
     pub fn new(init: &Parameters<'a>, frame_rate: Hertz) -> Self {
-        let frames = convert_ns_to_frames(init.duration_ns, frame_rate);
-        let base_state = AnimationState::new(init.rainbow, init.is_rainbow_forward, frames);
-        let step_frames = convert_ns_to_frames(init.step_time_ns, frame_rate);
-        let step_frames = Progression::new(step_frames);
-        let updater = init.mode.get_updater();
+        let frame_count = convert_ns_to_frames(init.duration_ns, frame_rate);
+        let step_frame_count = convert_ns_to_frames(init.step_time_ns, frame_rate);
 
         Self {
-            base_state,
-            step_frames,
+            offset: 0,
+            frames: Progression::new(frame_count),
+            step_frames: Progression::new(step_frame_count),
             marquee_position_toggle: false,
+            has_been_triggered: false,
+            rainbow: StatefulRainbow::new(init.rainbow, init.is_rainbow_forward),
             direction: init.direction,
             subdivisions: init.subdivisions,
             pixels_per_pixel_group: init.pixels_per_pixel_group,
-            updater,
+            updater: init.mode.get_updater(),
         }
     }
 
@@ -194,15 +151,14 @@ impl<'a> Foreground<'a> {
         if let Some(f) = self.updater {
             f(self, segment);
         }
-        self.base_state.frames.increment();
+        let did_roll = self.frames.checked_increment();
+        if did_roll {
+            self.rainbow.increment();
+        }
     }
 
-    pub fn current_rainbow_color(&self) -> Color {
-        self.base_state.rainbow.current_color()
-    }
-
-    pub fn advance_rainbow_index(&mut self) {
-        self.base_state.rainbow.position.increment();
+    pub fn reset_trigger(&mut self) {
+        self.has_been_triggered = false;
     }
 
     fn increment_marquee_step(&mut self) {
@@ -230,4 +186,14 @@ impl<'a> Foreground<'a> {
             }
         }
     }
+}
+
+impl<'a> MarchingRainbow for Foreground<'a> {
+    fn rainbow(&self) -> &StatefulRainbow { &self.rainbow }
+    fn frames(&self) -> &Progression { &self.frames }
+}
+
+impl<'a> MarchingRainbowMut for Foreground<'a> {
+    fn rainbow_mut(&mut self) -> &'a mut StatefulRainbow { &mut self.rainbow }
+    fn frames_mut(&mut self) -> &mut Progression { &mut self.frames }
 }

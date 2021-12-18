@@ -1,8 +1,5 @@
-use crate::utility::Progression;
-use crate::{background, colors as c, foreground, trigger};
+use crate::{background, foreground, trigger};
 use crate::colors::Color;
-use crate::leds::ws28xx::LogicalStrip;
-use embedded_time::fixed_point::FixedPoint;
 use embedded_time::rate::*;
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
@@ -39,22 +36,11 @@ pub struct AnimationParameters<'a> {
     pub trigger: trigger::GlobalParameters<'a>,
 }
 
-/// This contains all the information needed to keep track of the current state of a foreground or
-/// background animation. It is updated every frame to match the current state of the animation.
-#[derive(Default)]
-struct AnimationState {
-    offset: u16,
-    frames: Progression,
-    current_rainbow_color_index: usize,
-    has_been_triggered: bool,
-}
-
 /// This struct contains all the fixed parameters of an animation, as well as the state of the
 /// foreground, background, and active trigger animations. It is updated by the LightingController
 /// that it is attached to at the LightingController's frame rate based on the parameters provided.
 /// To make a new animation,
 pub struct Animation<'a, const N_LED: usize> {
-    parameters: AnimationParameters<'a>,
     translation_array: [usize; N_LED],
     segment: [Color; N_LED],
     fg_state: foreground::Foreground<'a>,
@@ -73,21 +59,19 @@ pub trait Animatable<'a> {
 
 impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
     fn update(&mut self) {
-        // Update BG:
+        // Update all three states
         self.bg_state.update(&mut self.segment);
-        // Update FG:
         self.fg_state.update(&mut self.segment);
-        // Update Triggers:
         self.triggers.update(&mut self.segment);
     }
 
     fn set_offset(&mut self, a_type: AnimationType, offset: u16) {
         match a_type {
             AnimationType::Background => {
-                self.bg_state.base_state.offset = offset;
+                self.bg_state.offset = offset;
             }
             AnimationType::Foreground => {
-                self.fg_state.base_state.offset = offset;
+                self.fg_state.offset = offset;
             }
             AnimationType::Trigger => {
                 // Triggers don't use offsets, so do nothing until they need to.
@@ -113,10 +97,10 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
         match params.mode {
             trigger::Mode::NoTrigger => { }
             trigger::Mode::Background => {
-                self.bg_state.base_state.has_been_triggered = true;
+                self.bg_state.has_been_triggered = true;
             }
             trigger::Mode::Foreground => {
-                self.fg_state.base_state.has_been_triggered = true;
+                self.fg_state.has_been_triggered = true;
             }
             _ => self.triggers.add_trigger(params, frame_rate),
 
@@ -150,7 +134,6 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
         let random_number_generator = SmallRng::seed_from_u64(random_seed);
 
         Animation {
-            parameters,
             translation_array,
             segment,
             fg_state,

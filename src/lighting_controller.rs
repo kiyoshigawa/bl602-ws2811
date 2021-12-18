@@ -44,9 +44,11 @@ where
         if self.timer.periodic_check_timeout().is_ok() {
             for animation in self.animations.iter_mut() {
                 animation.update();
+
                 let segment = animation.segment();
                 let translater = animation.translation_array();
                 let translated = translater.iter().zip(segment.iter());
+
                 for (&index, &color) in translated {
                     self.logical_strip.set_color_at_index(index, color);
                 }

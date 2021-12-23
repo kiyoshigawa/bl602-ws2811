@@ -175,10 +175,10 @@ fn main() -> ! {
     }
 
     // Make a single animation operating on the whole strip:
-    let mut s_a = a::Animation::new(da::ANI_TEST, s_ta, 60.Hz(), 2173481723);
-    let mut e_a = a::Animation::new(da::ANI_TEST, e_ta, 60.Hz(), 9238479238);
-    let mut n_a = a::Animation::new(da::ANI_TEST, n_ta, 60.Hz(), 2309489849);
-    let mut w_a = a::Animation::new(da::ANI_TEST, w_ta, 60.Hz(), 3928392389);
+    let mut s_a = a::Animation::new(da::ANI_TEST, s_ta, 60.Hz());
+    let mut e_a = a::Animation::new(da::ANI_TEST, e_ta, 60.Hz());
+    let mut n_a = a::Animation::new(da::ANI_TEST, n_ta, 60.Hz());
+    let mut w_a = a::Animation::new(da::ANI_TEST, w_ta, 60.Hz());
     let animation_array: [&mut dyn Animatable; 4] = [&mut s_a, &mut e_a, &mut n_a, &mut w_a];
 
     let mut lc =

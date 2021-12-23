@@ -1,5 +1,5 @@
-use crate::{background, foreground, trigger};
 use crate::colors::Color;
+use crate::{background, foreground, trigger};
 use embedded_time::rate::*;
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
@@ -45,8 +45,7 @@ pub struct Animation<'a, const N_LED: usize> {
     segment: [Color; N_LED],
     fg_state: foreground::Foreground<'a>,
     bg_state: background::Background<'a>,
-    triggers: trigger::TriggerCollection::<'a, MAX_NUM_ACTIVE_TRIGGERS>,
-    random_number_generator: SmallRng,
+    triggers: trigger::TriggerCollection<'a, MAX_NUM_ACTIVE_TRIGGERS>,
 }
 
 pub trait Animatable<'a> {
@@ -80,7 +79,7 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
     }
 
     fn trigger(&mut self, params: &trigger::Parameters, frame_rate: Hertz) {
-        let random_offset = (self.random_number_generator.next_u32() % MAX_OFFSET as u32) as u16;
+        // let random_offset = (self.random_number_generator.next_u32() % MAX_OFFSET as u32) as u16;
         let starting_color_bucket = params.starting_offset / Self::OFFSET_BETWEEN_LEDS;
         let starting_color_offset = starting_color_bucket * Self::OFFSET_BETWEEN_LEDS;
 
@@ -95,7 +94,7 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
         // };
 
         match params.mode {
-            trigger::Mode::NoTrigger => { }
+            trigger::Mode::NoTrigger => {}
             trigger::Mode::Background => {
                 self.bg_state.has_been_triggered = true;
             }
@@ -103,7 +102,6 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
                 self.fg_state.has_been_triggered = true;
             }
             _ => self.triggers.add_trigger(params, frame_rate),
-
         }
     }
 
@@ -114,8 +112,6 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
     fn translation_array(&self) -> &[usize] {
         &self.translation_array[..]
     }
-
-
 }
 
 impl<'a, const N_LED: usize> Animation<'a, N_LED> {
@@ -125,21 +121,12 @@ impl<'a, const N_LED: usize> Animation<'a, N_LED> {
         parameters: AnimationParameters<'a>,
         translation_array: [usize; N_LED],
         frame_rate: Hertz,
-        random_seed: u64,
     ) -> Self {
         let segment = [Color::default(); N_LED];
         let fg_state = foreground::Foreground::new(&parameters.fg, frame_rate);
         let bg_state = background::Background::new(&parameters.bg, frame_rate);
         let triggers = trigger::TriggerCollection::new(&parameters.trigger, frame_rate);
-        let random_number_generator = SmallRng::seed_from_u64(random_seed);
 
-        Animation {
-            translation_array,
-            segment,
-            fg_state,
-            bg_state,
-            triggers,
-            random_number_generator,
-        }
+        Animation { translation_array, segment, fg_state, bg_state, triggers }
     }
 }

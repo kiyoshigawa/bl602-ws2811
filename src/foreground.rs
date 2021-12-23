@@ -1,4 +1,4 @@
-use crate::{a::MAX_OFFSET, animations::{Direction}, c::{self, Color, Rainbow}, utility::{MarchingRainbow, MarchingRainbowMut, Progression, StatefulRainbow, convert_ns_to_frames}};
+use crate::{a::MAX_OFFSET, animations::{Direction}, c::{self, Color, Rainbow}, utility::{MarchingRainbow, MarchingRainbowMut, Progression, SlowFadeRainbow, StatefulRainbow, convert_ns_to_frames}};
 use embedded_time::rate::Hertz;
 
 type FgUpdater = fn(&mut Foreground, &mut [Color]);
@@ -53,13 +53,13 @@ impl Mode {
 fn marquee_solid(fg: &mut Foreground, segment: &mut [Color]) {
     handle_marquee_trigger(fg);
     fg.increment_marquee_step();
-    fg.fill_marquee(fg.current_rainbow_color(), segment);
+    fg.fill_marquee(fg.current_slow_fade_color(), segment);
 }
 
 fn marquee_solid_fixed(fg: &mut Foreground, segment: &mut [Color]) {
     handle_marquee_trigger(fg);
     set_marquee_toggle(fg, segment.len());
-    fg.fill_marquee(fg.current_rainbow_color(), segment);
+    fg.fill_marquee(fg.current_slow_fade_color(), segment);
 }
 
 fn marquee_fade(fg: &mut Foreground, segment: &mut [Color]) {
@@ -77,7 +77,7 @@ fn marquee_fade_fixed(fg: &mut Foreground, segment: &mut [Color]) {
 }
 
 fn vu_meter(fg: &mut Foreground, segment: &mut [Color]) {
-    fg.current_rainbow_color();
+    fg.current_slow_fade_color();
     let led_count = segment.len();
     let last_on_led = fg.offset as usize / led_count;
     for led in &mut segment[last_on_led..] {
@@ -94,7 +94,7 @@ fn set_marquee_toggle(fg: &mut Foreground, led_count: usize) {
 
 fn handle_marquee_trigger(fg: &mut Foreground) {
     if fg.has_been_triggered {
-        fg.advance_rainbow_color_hard();
+        fg.advance_rainbow_color();
         fg.reset_trigger();
     }
 }
@@ -196,4 +196,9 @@ impl<'a> MarchingRainbow for Foreground<'a> {
 impl<'a> MarchingRainbowMut for Foreground<'a> {
     fn rainbow_mut(&mut self) -> &'a mut StatefulRainbow { &mut self.rainbow }
     fn frames_mut(&mut self) -> &mut Progression { &mut self.frames }
+}
+
+impl<'a> SlowFadeRainbow for Foreground<'a> {
+    fn rainbow(&self) -> &StatefulRainbow { &self.rainbow }
+    fn frames(&self) -> &Progression { &self.frames }
 }

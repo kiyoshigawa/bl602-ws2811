@@ -2,12 +2,14 @@ use embedded_time::rate::Hertz;
 use crate::a::{Direction, MAX_OFFSET};
 use crate::c::{self, Color, Rainbow};
 use crate::utility::{
+    self,
     MarchingRainbow,
     MarchingRainbowMut,
     Progression,
+    SlowFadeRainbow,
     StatefulRainbow,
     convert_ns_to_frames,
-    get_random_offset,
+    get_random_offset
 };
 type BgUpdater = fn(&mut Background, &mut [Color]);
 
@@ -87,14 +89,7 @@ fn fill_rainbow_rotate(bg: &mut Background, segment: &mut [Color]) {
     // current frame / total frames ratio to decide where to begin the rainbow. Need to do the
     // addition of the set offset plus the frame offset as u32s to avoid going over u16::MAX,
     // then modulo back to a u16 value using MAX_OFFSET when done.
-    let mut color_start_offset = bg.offset;
-
-    if bg.frames.total != 0 {
-        color_start_offset += (MAX_OFFSET as u32 * bg.frames.get_current()
-            / bg.frames.total) as u16;
-    }
-    color_start_offset %= MAX_OFFSET;
-
+    let color_start_offset = utility::shift_offset(bg.offset, bg.frames);
     bg.fill_rainbow(color_start_offset, bg.rainbow.backer, segment);
 }
 
@@ -109,7 +104,7 @@ fn handle_rainbow_trigger(bg: &mut Background) {
 /// Advances the rainbow which concurrently resets the frame count
 fn handle_solid_trigger(bg: &mut Background) {
     if bg.has_been_triggered {
-        bg.advance_rainbow_color_hard();
+        bg.advance_rainbow_color();
         bg.reset_trigger();
     }
 }
@@ -236,4 +231,9 @@ impl<'a> MarchingRainbow for Background<'a> {
 impl<'a> MarchingRainbowMut for Background<'a> {
     fn rainbow_mut(&mut self) -> &'a mut StatefulRainbow { &mut self.rainbow }
     fn frames_mut(&mut self) -> &mut Progression { &mut self.frames }
+}
+
+impl<'a> SlowFadeRainbow for Background<'a> {
+    fn rainbow(&self) -> &StatefulRainbow { &self.rainbow }
+    fn frames(&self) -> &Progression { &self.frames }
 }

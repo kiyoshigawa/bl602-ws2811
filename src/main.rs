@@ -2,13 +2,13 @@
 #![no_main]
 
 pub mod animations;
+pub mod background;
 pub mod colors;
 pub mod default_animations;
+pub mod foreground;
 pub mod hardware;
 pub mod leds;
 pub mod lighting_controller;
-pub mod foreground;
-pub mod background;
 pub mod trigger;
 pub mod utility;
 
@@ -175,10 +175,10 @@ fn main() -> ! {
     }
 
     // Make a single animation operating on the whole strip:
-    let mut s_a = a::Animation::new(da::ANI_TEST, s_ta, 2173481723);
-    let mut e_a = a::Animation::new(da::ANI_TEST, e_ta, 9238479238);
-    let mut n_a = a::Animation::new(da::ANI_TEST, n_ta, 2309489849);
-    let mut w_a = a::Animation::new(da::ANI_TEST, w_ta, 3928392389);
+    let mut s_a = a::Animation::new(da::ANI_TEST, s_ta, 60.Hz(), 2173481723);
+    let mut e_a = a::Animation::new(da::ANI_TEST, e_ta, 60.Hz(), 9238479238);
+    let mut n_a = a::Animation::new(da::ANI_TEST, n_ta, 60.Hz(), 2309489849);
+    let mut w_a = a::Animation::new(da::ANI_TEST, w_ta, 60.Hz(), 3928392389);
     let animation_array: [&mut dyn Animatable; 4] = [&mut s_a, &mut e_a, &mut n_a, &mut w_a];
 
     let mut lc =
@@ -187,8 +187,8 @@ fn main() -> ! {
     // get a millisecond delay for use with test patterns:
     // let mut d = bl602_hal::delay::McycleDelay::new(clocks.sysclk().0);
 
-    let test_trigger = a::AnimationTriggerParameters {
-        mode: a::TriggerMode::FlashRainbow,
+    let test_trigger = trigger::Parameters {
+        mode: trigger::Mode::FlashRainbow,
         direction: a::Direction::Stopped,
         step_time_ns: 0,
         fade_in_time_ns: 250_000_000,

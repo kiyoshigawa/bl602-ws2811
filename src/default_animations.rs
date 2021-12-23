@@ -1,7 +1,7 @@
 use crate::animations::*;
-use crate::foreground;
 use crate::background;
 use crate::colors as c;
+use crate::foreground;
 use crate::trigger;
 
 /// This value is used as a default value for the number of subdivisions on the const animations at
@@ -41,11 +41,8 @@ pub const FG_OFF: foreground::Parameters = foreground::Parameters {
 };
 
 /// This global trigger parameter struct can be used to turn off all trigger effects.
-pub const TRIGGER_OFF: trigger::GlobalParameters = trigger::GlobalParameters {
-    rainbow: c::R_OFF,
-    is_rainbow_forward: true,
-    duration_ns: 0,
-};
+pub const TRIGGER_OFF: trigger::GlobalParameters =
+    trigger::GlobalParameters { rainbow: c::R_OFF, is_rainbow_forward: true, duration_ns: 0 };
 
 /// This animation parameter struct will turn off ALL animations: fg, bg, and trigger.
 pub const ANI_ALL_OFF: AnimationParameters =
@@ -54,7 +51,7 @@ pub const ANI_ALL_OFF: AnimationParameters =
 /// This is an animation background struct used for testing
 pub const BG_TEST: background::Parameters = background::Parameters {
     mode: background::Mode::FillRainbowRotate,
-    rainbow: c::R_GREEN,
+    rainbow: c::R_ROYGBIV,
     direction: Direction::Positive,
     is_rainbow_forward: true,
     duration_ns: 20_000_000_000,
@@ -63,8 +60,8 @@ pub const BG_TEST: background::Parameters = background::Parameters {
 
 /// This is an animation foreground struct used for testing
 pub const FG_TEST: foreground::Parameters = foreground::Parameters {
-    mode: foreground::Mode::MarqueeFadeFixed,
-    rainbow: c::R_OB,
+    mode: foreground::Mode::NoForeground,
+    rainbow: c::R_OFF,
     direction: Direction::Positive,
     is_rainbow_forward: true,
     duration_ns: 10_000_000_000,

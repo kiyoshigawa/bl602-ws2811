@@ -1,4 +1,12 @@
-use crate::{a::MAX_OFFSET, animations::{Direction}, c::{self, Color, Rainbow}, utility::{MarchingRainbow, MarchingRainbowMut, Progression, SlowFadeRainbow, StatefulRainbow, convert_ns_to_frames}};
+use crate::{
+    animations::{Direction, MAX_OFFSET},
+    colors,
+    colors::{Color, Rainbow},
+    utility::{
+        convert_ns_to_frames, MarchingRainbow, MarchingRainbowMut, Progression, SlowFadeRainbow,
+        StatefulRainbow,
+    },
+};
 use embedded_time::rate::Hertz;
 
 type FgUpdater = fn(&mut Foreground, &mut [Color]);
@@ -81,13 +89,12 @@ fn vu_meter(fg: &mut Foreground, segment: &mut [Color]) {
     let led_count = segment.len();
     let last_on_led = fg.offset as usize / led_count;
     for led in &mut segment[last_on_led..] {
-        *led = c::C_OFF;
+        *led = colors::C_OFF;
     }
 }
 
 fn set_marquee_toggle(fg: &mut Foreground, led_count: usize) {
-    let pip_distance =
-        (MAX_OFFSET as usize / led_count) * fg.pixels_per_pixel_group.max(1);
+    let pip_distance = (MAX_OFFSET as usize / led_count) * fg.pixels_per_pixel_group.max(1);
     let led_bucket = fg.offset as usize / pip_distance.max(1);
     fg.marquee_position_toggle = led_bucket % 2 == 0;
 }
@@ -189,16 +196,28 @@ impl<'a> Foreground<'a> {
 }
 
 impl<'a> MarchingRainbow for Foreground<'a> {
-    fn rainbow(&self) -> &StatefulRainbow { &self.rainbow }
-    fn frames(&self) -> &Progression { &self.frames }
+    fn rainbow(&self) -> &StatefulRainbow {
+        &self.rainbow
+    }
+    fn frames(&self) -> &Progression {
+        &self.frames
+    }
 }
 
 impl<'a> MarchingRainbowMut for Foreground<'a> {
-    fn rainbow_mut(&mut self) -> &'a mut StatefulRainbow { &mut self.rainbow }
-    fn frames_mut(&mut self) -> &mut Progression { &mut self.frames }
+    fn rainbow_mut(&mut self) -> &'a mut StatefulRainbow {
+        &mut self.rainbow
+    }
+    fn frames_mut(&mut self) -> &mut Progression {
+        &mut self.frames
+    }
 }
 
 impl<'a> SlowFadeRainbow for Foreground<'a> {
-    fn rainbow(&self) -> &StatefulRainbow { &self.rainbow }
-    fn frames(&self) -> &Progression { &self.frames }
+    fn rainbow(&self) -> &StatefulRainbow {
+        &self.rainbow
+    }
+    fn frames(&self) -> &Progression {
+        &self.frames
+    }
 }

@@ -1,3 +1,4 @@
+use crate::leds::ws28xx as strip;
 use crate::NUM_STRIPS;
 use bl602_hal::timer::{ConfiguredTimerChannel0, ConfiguredTimerChannel1, Preload};
 use core::convert::Infallible;

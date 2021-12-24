@@ -1,5 +1,5 @@
-use crate::a::{Direction, MAX_OFFSET};
-use crate::c::{self, Color, Rainbow};
+use crate::animations::{Direction, MAX_OFFSET};
+use crate::colors::{self, Color, Rainbow};
 use crate::utility::{
     self, convert_ns_to_frames, get_random_offset, MarchingRainbow, MarchingRainbowMut,
     Progression, SlowFadeRainbow, StatefulRainbow,
@@ -53,7 +53,7 @@ impl Mode {
 
 /// Sets all LEDs to off
 fn no_background(bg: &mut Background, segment: &mut [Color]) {
-    bg.fill_solid(c::C_OFF, segment);
+    bg.fill_solid(colors::C_OFF, segment);
 }
 
 /// Sets all LEDs to the current rainbow color. Note that in this mode the color will only
@@ -157,7 +157,7 @@ impl<'a> Background<'a> {
         segment.iter_mut().for_each(|led| *led = color);
     }
 
-    fn fill_rainbow(&mut self, start_offset: u16, rainbow: &[c::Color], segment: &mut [Color]) {
+    fn fill_rainbow(&mut self, start_offset: u16, rainbow: &[Color], segment: &mut [Color]) {
         let start_offset = start_offset as usize;
         let max_offset = MAX_OFFSET as usize;
         let led_count = segment.len();
@@ -198,7 +198,7 @@ impl<'a> Background<'a> {
             let end_color_index = (rainbow_bucket + 1) % rainbow_length;
             let end_color = rainbow[end_color_index];
 
-            let mid_color = c::Color::color_lerp(
+            let mid_color = colors::Color::color_lerp(
                 factor as i32,
                 0,
                 distance_between_colors as i32,

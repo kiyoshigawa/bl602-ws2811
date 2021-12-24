@@ -1,5 +1,6 @@
-use crate::a::{Direction, MAX_OFFSET};
-use crate::c::{self, Color};
+use crate::animations::{Direction, MAX_OFFSET};
+use crate::colors;
+use crate::colors::Color;
 use crate::utility::{
     convert_ns_to_frames, get_random_offset, shift_offset, MarchingRainbow, MarchingRainbowMut,
     Progression, SlowFadeRainbow, StatefulRainbow, TimedRainbows,
@@ -99,7 +100,7 @@ impl Mode {
 
 /// All triggers share a single rainbow / slow fade speed, which is configured in this struct
 pub struct GlobalParameters<'a> {
-    pub rainbow: c::Rainbow<'a>,
+    pub rainbow: colors::Rainbow<'a>,
     pub is_rainbow_forward: bool,
     pub duration_ns: u64,
 }

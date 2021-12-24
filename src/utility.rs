@@ -1,8 +1,8 @@
 use core::ops::Index;
 
 use crate::{
-    a::MAX_OFFSET,
-    c::{Color, Rainbow},
+    animations::MAX_OFFSET,
+    colors::{Color, Rainbow},
 };
 use embedded_time::{fixed_point::FixedPoint, rate::Hertz};
 

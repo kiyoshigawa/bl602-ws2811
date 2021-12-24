@@ -1,6 +1,6 @@
 pub mod ws28xx {
-    use crate::colors as c;
     use crate::hardware::{HardwareController, PeriodicTimer};
+    use crate::{colors as c, MAX_SINGLE_STRIP_BYTE_BUFFER_LENGTH};
     use bitvec::prelude::*;
     use embedded_time::duration::*;
 
@@ -151,8 +151,8 @@ pub mod ws28xx {
             &self,
             colors: impl Iterator<Item = &'a c::Color>,
             color_order: &ColorOrder,
-        ) -> [u8; crate::MAX_SINGLE_STRIP_BYTE_BUFFER_LENGTH] {
-            let mut byte_buffer = [0_u8; crate::MAX_SINGLE_STRIP_BYTE_BUFFER_LENGTH];
+        ) -> [u8; MAX_SINGLE_STRIP_BYTE_BUFFER_LENGTH] {
+            let mut byte_buffer = [0_u8; MAX_SINGLE_STRIP_BYTE_BUFFER_LENGTH];
 
             // Set the bytes in the RGB order for this strip
             let offsets = color_order.offsets();

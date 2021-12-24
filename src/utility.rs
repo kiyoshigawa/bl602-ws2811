@@ -1,6 +1,9 @@
 use core::ops::Index;
 
-use crate::{a::MAX_OFFSET, c::{Color, Rainbow}};
+use crate::{
+    a::MAX_OFFSET,
+    c::{Color, Rainbow},
+};
 use embedded_time::{fixed_point::FixedPoint, rate::Hertz};
 
 pub fn convert_ns_to_frames(nanos: u64, frame_rate: Hertz) -> usize {
@@ -122,18 +125,30 @@ pub struct TimedRainbows<'a, 'b> {
 }
 
 impl<'a, 'b> SlowFadeRainbow for TimedRainbows<'a, 'b> {
-    fn rainbow(&self) -> &StatefulRainbow { self.slow_fade_rainbow }
-    fn frames(&self) -> &Progression { self.frames }
+    fn rainbow(&self) -> &StatefulRainbow {
+        self.slow_fade_rainbow
+    }
+    fn frames(&self) -> &Progression {
+        self.frames
+    }
 }
 
 impl<'a, 'b> MarchingRainbow for TimedRainbows<'a, 'b> {
-    fn rainbow(&self) -> &StatefulRainbow { self.incremental_rainbow }
-    fn frames(&self) -> &Progression { self.frames }
+    fn rainbow(&self) -> &StatefulRainbow {
+        self.incremental_rainbow
+    }
+    fn frames(&self) -> &Progression {
+        self.frames
+    }
 }
 
 impl<'a, 'b> MarchingRainbowMut for TimedRainbows<'a, 'b> {
-    fn rainbow_mut(&mut self) -> &'a mut StatefulRainbow { self.incremental_rainbow }
-    fn frames_mut(&mut self) -> &mut Progression { self.frames }
+    fn rainbow_mut(&mut self) -> &'a mut StatefulRainbow {
+        self.incremental_rainbow
+    }
+    fn frames_mut(&mut self) -> &mut Progression {
+        self.frames
+    }
 }
 
 pub struct StatefulRainbow<'a> {
@@ -194,8 +209,14 @@ impl Progression {
         self.total <= 1
     }
 
+    pub fn is_first_frame(&self) -> bool {
+        self.current == 0
+    }
+
     pub fn get_current(&self) -> usize {
-        if self.is_mono() { return 0; }
+        if self.is_mono() {
+            return 0;
+        }
         match self.is_forward {
             true => self.current,
             false => self.total - 1 - self.current,
@@ -203,29 +224,39 @@ impl Progression {
     }
 
     pub fn set_current(&mut self, value: usize) {
-        if self.is_mono() { return }
+        if self.is_mono() {
+            return;
+        }
         let value = value % self.total;
         self.current = value;
     }
 
     pub fn decrement(&mut self) {
-        if self.is_mono() { return; }
+        if self.is_mono() {
+            return;
+        }
         self.current = self.peek_prev();
     }
 
     pub fn checked_decrement(&mut self) -> bool {
-        if self.is_mono() { return false; }
+        if self.is_mono() {
+            return false;
+        }
         self.decrement();
         self.current == self.total - 1
     }
 
     pub fn increment(&mut self) {
-        if self.is_mono() { return; }
+        if self.is_mono() {
+            return;
+        }
         self.current = self.peek_next();
     }
 
     pub fn checked_increment(&mut self) -> bool {
-        if self.is_mono() { return false; }
+        if self.is_mono() {
+            return false;
+        }
         self.increment();
         self.current == 0
     }
@@ -239,12 +270,16 @@ impl Progression {
     }
 
     fn up_one(&self) -> usize {
-        if self.is_mono() { return 0; }
+        if self.is_mono() {
+            return 0;
+        }
         (self.current + 1) % self.total
     }
 
     fn down_one(&self) -> usize {
-        if self.is_mono() { return 0; }
+        if self.is_mono() {
+            return 0;
+        }
         (self.current + self.total - 1) % self.total
     }
 
@@ -255,12 +290,6 @@ impl Progression {
 
 impl Color {
     pub fn lerp_with(&self, to_color: Color, factor: Progression) -> Color {
-        Color::color_lerp(
-            factor.get_current() as i32,
-            0,
-            factor.total as i32,
-            *self,
-            to_color,
-        )
+        Color::color_lerp(factor.get_current() as i32, 0, factor.total as i32, *self, to_color)
     }
 }

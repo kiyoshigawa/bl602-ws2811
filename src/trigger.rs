@@ -1,6 +1,9 @@
-use crate::a::{self, Direction};
+use crate::a::Direction;
 use crate::c::{self, Color};
-use crate::utility::{MarchingRainbow, MarchingRainbowMut, Progression, SlowFadeRainbow, StatefulRainbow, TimedRainbows, convert_ns_to_frames, get_random_offset};
+use crate::utility::{
+    convert_ns_to_frames, get_random_offset, MarchingRainbow, MarchingRainbowMut, Progression,
+    SlowFadeRainbow, StatefulRainbow, TimedRainbows,
+};
 use arrayvec::ArrayVec;
 use embedded_time::rate::Hertz;
 
@@ -71,24 +74,24 @@ pub enum Mode {
     /// Each flash will be a new color in the order of the rainbow.
     FlashRainbow,
 
-    Custom(TriggerBehavior)
+    Custom(TriggerBehavior),
 }
 
 impl Mode {
     pub fn get_behavior(&self) -> TriggerBehavior {
         match *self {
-            Mode::NoTrigger  => (None, None),
+            Mode::NoTrigger => (None, None),
             Mode::Background => (None, None),
             Mode::Foreground => (None, None),
-            Mode::ColorPulse         => (Some(init_color_pulse), Some(color_pulse)),
+            Mode::ColorPulse => (Some(init_color_pulse), Some(color_pulse)),
             Mode::ColorPulseSlowFade => (Some(init_color_pulse_slow_fade), Some(color_pulse)),
-            Mode::ColorPulseRainbow  => (Some(init_color_pulse_rainbow), Some(color_pulse)),
-            Mode::ColorShot         => (Some(init_color_shot), Some(color_shot)),
+            Mode::ColorPulseRainbow => (Some(init_color_pulse_rainbow), Some(color_pulse)),
+            Mode::ColorShot => (Some(init_color_shot), Some(color_shot)),
             Mode::ColorShotSlowFade => (Some(init_color_shot_slow_fade), Some(color_shot)),
-            Mode::ColorShotRainbow  => (Some(init_color_shot_rainbow), Some(color_shot)),
-            Mode::Flash         => (Some(init_flash), Some(flash)),
+            Mode::ColorShotRainbow => (Some(init_color_shot_rainbow), Some(color_shot)),
+            Mode::Flash => (Some(init_flash), Some(flash)),
             Mode::FlashSlowFade => (Some(init_flash_slow_fade), Some(flash)),
-            Mode::FlashRainbow  => (Some(init_flash_rainbow), Some(flash)),
+            Mode::FlashRainbow => (Some(init_flash_rainbow), Some(flash)),
             Mode::Custom((i, u)) => (i, u),
         }
     }
@@ -117,12 +120,7 @@ impl<'a, const N: usize> TriggerCollection<'a, N> {
         let frames = Progression::new(convert_ns_to_frames(init.duration_ns, frame_rate));
         let triggers = ArrayVec::new();
 
-        Self {
-            slow_fade_rainbow,
-            incremental_rainbow,
-            frames,
-            triggers,
-        }
+        Self { slow_fade_rainbow, incremental_rainbow, frames, triggers }
     }
 
     pub fn add_trigger(&mut self, init: &Parameters, frame_rate: Hertz) {
@@ -130,12 +128,14 @@ impl<'a, const N: usize> TriggerCollection<'a, N> {
         let mut new_trigger = Trigger::new(init, self.current_rainbow_color(), frame_rate);
 
         if let Some(initialize) = initializer {
-            initialize(&mut new_trigger, &mut TimedRainbows {
-                slow_fade_rainbow: &mut self.slow_fade_rainbow,
-                incremental_rainbow:&mut self.incremental_rainbow,
-                frames: &mut self.frames,
-            });
-
+            initialize(
+                &mut new_trigger,
+                &mut TimedRainbows {
+                    slow_fade_rainbow: &mut self.slow_fade_rainbow,
+                    incremental_rainbow: &mut self.incremental_rainbow,
+                    frames: &mut self.frames,
+                },
+            );
         }
         new_trigger.updater = updater;
 
@@ -147,7 +147,8 @@ impl<'a, const N: usize> TriggerCollection<'a, N> {
             trigger.update(segment)
         }
 
-        self.triggers.retain(|t| t.frames.get_current() < t.frames.total - 1);
+        self.triggers
+            .retain(|t| t.frames.get_current() < t.frames.total - 1);
         let did_roll = self.frames.checked_increment();
         if did_roll {
             self.slow_fade_rainbow.increment();
@@ -178,6 +179,7 @@ pub struct Trigger {
     direction: Direction,
     color: Color,
     updater: Option<TriggerUpdater>,
+    pixels_per_pixel_group: usize,
 }
 
 impl Trigger {
@@ -192,14 +194,9 @@ impl Trigger {
         let direction = init.direction;
         let updater = None;
 
-        Self {
-            offset,
-            frames,
-            transition_frame,
-            direction,
-            color,
-            updater,
-        }
+        let pixels_per_pixel_group = init.pixels_per_pixel_group;
+
+        Self { offset, frames, transition_frame, direction, color, updater, pixels_per_pixel_group }
     }
 
     pub fn update(&mut self, segment: &mut [Color]) {
@@ -231,19 +228,46 @@ fn flash(trigger: &mut Trigger, segment: &mut [Color]) {
 }
 
 impl<'a, const N: usize> MarchingRainbow for TriggerCollection<'a, N> {
-    fn rainbow(&self) -> &StatefulRainbow { &self.slow_fade_rainbow }
-    fn frames(&self) -> &Progression { &self.frames }
+    fn rainbow(&self) -> &StatefulRainbow {
+        &self.slow_fade_rainbow
+    }
+    fn frames(&self) -> &Progression {
+        &self.frames
+    }
 }
 
 fn color_pulse(trigger: &mut Trigger, segment: &mut [Color]) {
-    todo!()
+    if trigger.frames.is_first_frame() {
+        trigger.offset = get_random_offset();
+    }
+
+    let is_fade_in = trigger.frames.get_current() < trigger.transition_frame;
+
+    let mut progress;
+    let mut transition_frame = 0;
+    if is_fade_in {
+        progress = Progression::new(trigger.transition_frame);
+    } else {
+        progress = Progression::new(trigger.frames.total - trigger.transition_frame);
+        progress.reverse_direction();
+        transition_frame = trigger.transition_frame;
+    }
+
+    progress.set_current(trigger.frames.get_current() - transition_frame);
+
+    let first_led_index = trigger.offset as usize / segment.len();
+    let last_led_index = first_led_index + (trigger.pixels_per_pixel_group.min(1) - 1);
+    for index in first_led_index..=last_led_index {
+        let corrected_index = index % segment.len();
+        segment[corrected_index] = segment[corrected_index].lerp_with(trigger.color, progress);
+    }
 }
 
 fn color_shot(trigger: &mut Trigger, segment: &mut [Color]) {
     todo!()
 }
 
-fn init_color_pulse(trigger: &mut Trigger, global: &mut TimedRainbows) {
+fn init_color_pulse(trigger: &mut Trigger, _: &mut TimedRainbows) {
     trigger.direction = Direction::Stopped;
     trigger.offset = get_random_offset();
 }
@@ -254,12 +278,12 @@ fn init_color_pulse_slow_fade(trigger: &mut Trigger, global: &mut TimedRainbows)
 }
 
 fn init_color_pulse_rainbow(trigger: &mut Trigger, global: &mut TimedRainbows) {
-    global.advance_rainbow_color();
     trigger.color = global.current_rainbow_color();
     init_color_pulse(trigger, global);
+    global.advance_rainbow_color();
 }
 
-fn init_color_shot(trigger: &mut Trigger, global: &mut TimedRainbows) {
+fn init_color_shot(trigger: &mut Trigger, _: &mut TimedRainbows) {
     trigger.frames.total = trigger.transition_frame;
     trigger.offset = 0;
 }
@@ -270,12 +294,12 @@ fn init_color_shot_slow_fade(trigger: &mut Trigger, global: &mut TimedRainbows) 
 }
 
 fn init_color_shot_rainbow(trigger: &mut Trigger, global: &mut TimedRainbows) {
-    global.advance_rainbow_color();
     trigger.color = global.current_rainbow_color();
     init_color_shot(trigger, global);
+    global.advance_rainbow_color();
 }
 
-fn init_flash(trigger: &mut Trigger, global: &mut TimedRainbows) {
+fn init_flash(trigger: &mut Trigger, _: &mut TimedRainbows) {
     trigger.direction = Direction::Stopped;
 }
 

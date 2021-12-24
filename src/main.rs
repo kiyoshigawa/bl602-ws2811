@@ -1,17 +1,17 @@
 #![no_std]
 #![no_main]
 
-use bl602_ws2811::animations as a;
-use bl602_ws2811::colors as c;
-use bl602_ws2811::default_animations as da;
-use bl602_ws2811::leds::ws28xx as strip;
-use bl602_ws2811::lighting_controller as lc;
+use bl602_ws2811::*;
+
+use animations as a;
+use colors as c;
+use default_animations as da;
+use hardware::{DynamicPin, HardwareController};
+use leds::ws28xx as strip;
+use lighting_controller as lc;
 
 use bl602_hal as hal;
-use bl602_ws2811::hardware::{DynamicPin, HardwareController};
 use core::fmt::Write;
-// use embedded_hal::delay::blocking::DelayMs;
-use bl602_ws2811::*;
 use embedded_time::rate::*;
 use hal::{
     clock::{Strict, SysclkFreq, UART_PLL_FREQ},

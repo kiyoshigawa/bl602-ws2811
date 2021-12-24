@@ -1,16 +1,10 @@
-use embedded_time::rate::Hertz;
 use crate::a::{Direction, MAX_OFFSET};
 use crate::c::{self, Color, Rainbow};
 use crate::utility::{
-    self,
-    MarchingRainbow,
-    MarchingRainbowMut,
-    Progression,
-    SlowFadeRainbow,
-    StatefulRainbow,
-    convert_ns_to_frames,
-    get_random_offset
+    self, convert_ns_to_frames, get_random_offset, MarchingRainbow, MarchingRainbowMut,
+    Progression, SlowFadeRainbow, StatefulRainbow,
 };
+use embedded_time::rate::Hertz;
 type BgUpdater = fn(&mut Background, &mut [Color]);
 
 /// Background Modes are rendered onto the animation LEDs first before any Foreground or Trigger
@@ -159,16 +153,11 @@ impl<'a> Background<'a> {
         self.has_been_triggered = false;
     }
 
-    fn fill_solid(&mut self, color: Color, segment: &mut[Color]) {
+    fn fill_solid(&mut self, color: Color, segment: &mut [Color]) {
         segment.iter_mut().for_each(|led| *led = color);
     }
 
-    fn fill_rainbow(
-        &mut self,
-        start_offset: u16,
-        rainbow: &[c::Color],
-        segment: &mut [Color],
-    ) {
+    fn fill_rainbow(&mut self, start_offset: u16, rainbow: &[c::Color], segment: &mut [Color]) {
         let start_offset = start_offset as usize;
         let max_offset = MAX_OFFSET as usize;
         let led_count = segment.len();
@@ -191,7 +180,7 @@ impl<'a> Background<'a> {
         let led_iterator = segment
             .iter_mut()
             .enumerate()
-            .map(|(i, c)| (get_position(i), c) );
+            .map(|(i, c)| (get_position(i), c));
 
         for (led_position, led) in led_iterator {
             // move the led position by offset rather than the rainbow itself
@@ -220,20 +209,31 @@ impl<'a> Background<'a> {
             *led = mid_color;
         }
     }
-
 }
 
 impl<'a> MarchingRainbow for Background<'a> {
-    fn rainbow(&self) -> &StatefulRainbow { &self.rainbow }
-    fn frames(&self) -> &Progression { &self.frames }
+    fn rainbow(&self) -> &StatefulRainbow {
+        &self.rainbow
+    }
+    fn frames(&self) -> &Progression {
+        &self.frames
+    }
 }
 
 impl<'a> MarchingRainbowMut for Background<'a> {
-    fn rainbow_mut(&mut self) -> &'a mut StatefulRainbow { &mut self.rainbow }
-    fn frames_mut(&mut self) -> &mut Progression { &mut self.frames }
+    fn rainbow_mut(&mut self) -> &'a mut StatefulRainbow {
+        &mut self.rainbow
+    }
+    fn frames_mut(&mut self) -> &mut Progression {
+        &mut self.frames
+    }
 }
 
 impl<'a> SlowFadeRainbow for Background<'a> {
-    fn rainbow(&self) -> &StatefulRainbow { &self.rainbow }
-    fn frames(&self) -> &Progression { &self.frames }
+    fn rainbow(&self) -> &StatefulRainbow {
+        &self.rainbow
+    }
+    fn frames(&self) -> &Progression {
+        &self.frames
+    }
 }

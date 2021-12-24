@@ -188,11 +188,10 @@ fn main() -> ! {
     // let mut d = bl602_hal::delay::McycleDelay::new(clocks.sysclk().0);
 
     let test_trigger = trigger::Parameters {
-        mode: trigger::Mode::ColorPulseSlowFade,
-        direction: a::Direction::Stopped,
-        step_time_ns: 0,
-        fade_in_time_ns: 250_000_000,
-        fade_out_time_ns: 750_000_000,
+        mode: trigger::Mode::ColorShot,
+        direction: a::Direction::Positive,
+        fade_in_time_ns: 1_250_000_000,
+        fade_out_time_ns: 1_750_000_000,
         starting_offset: 0,
         pixels_per_pixel_group: 1,
     };

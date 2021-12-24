@@ -1,8 +1,8 @@
-use crate::a::Direction;
+use crate::a::{Direction, MAX_OFFSET};
 use crate::c::{self, Color};
 use crate::utility::{
-    convert_ns_to_frames, get_random_offset, MarchingRainbow, MarchingRainbowMut, Progression,
-    SlowFadeRainbow, StatefulRainbow, TimedRainbows,
+    convert_ns_to_frames, get_random_offset, shift_offset, MarchingRainbow, MarchingRainbowMut,
+    Progression, SlowFadeRainbow, StatefulRainbow, TimedRainbows,
 };
 use arrayvec::ArrayVec;
 use embedded_time::rate::Hertz;
@@ -163,7 +163,6 @@ impl<'a, const N: usize> TriggerCollection<'a, N> {
 pub struct Parameters {
     pub mode: Mode,
     pub direction: Direction,
-    pub step_time_ns: u64,
     pub fade_in_time_ns: u64,
     pub fade_out_time_ns: u64,
     pub starting_offset: u16,
@@ -209,7 +208,7 @@ impl Trigger {
 
 impl<'a, const N: usize> MarchingRainbow for TriggerCollection<'a, N> {
     fn rainbow(&self) -> &StatefulRainbow {
-        &self.slow_fade_rainbow
+        &self.incremental_rainbow
     }
     fn frames(&self) -> &Progression {
         &self.frames
@@ -246,16 +245,28 @@ fn color_pulse(trigger: &mut Trigger, segment: &mut [Color]) {
 
     // the range will be always at least 1 led, up to pixels_per_pixel_group leds:
     let first_led_index = trigger.offset as usize / segment.len();
-    let last_led_index = first_led_index + (trigger.pixels_per_pixel_group.min(1) - 1);
+    let shot_width = 1.max(trigger.pixels_per_pixel_group);
+    let last_led_index = first_led_index + shot_width;
 
-    for index in first_led_index..=last_led_index {
+    for index in first_led_index..last_led_index {
         let corrected_index = index % segment.len();
         segment[corrected_index] = segment[corrected_index].lerp_with(trigger.color, progress);
     }
 }
 
 fn color_shot(trigger: &mut Trigger, segment: &mut [Color]) {
-    todo!()
+    let current_offset = shift_offset(trigger.offset, trigger.frames) as usize;
+    let offset_distance_between_leds = MAX_OFFSET as usize / segment.len();
+
+    // the range will be always at least 1 led, up to pixels_per_pixel_group leds:
+    let first_led_index = current_offset / offset_distance_between_leds;
+    let shot_width = 1.max(trigger.pixels_per_pixel_group);
+    let last_led_index = first_led_index + shot_width;
+
+    for index in first_led_index..last_led_index {
+        let corrected_index = index % segment.len();
+        segment[corrected_index] = trigger.color;
+    }
 }
 
 fn init_color_pulse(trigger: &mut Trigger, _: &mut TimedRainbows) {
@@ -274,9 +285,8 @@ fn init_color_pulse_rainbow(trigger: &mut Trigger, global: &mut TimedRainbows) {
     global.advance_rainbow_color();
 }
 
-fn init_color_shot(trigger: &mut Trigger, _: &mut TimedRainbows) {
-    trigger.frames.total = trigger.transition_frame;
-    trigger.offset = 0;
+fn init_color_shot(_: &mut Trigger, _: &mut TimedRainbows) {
+    // Don't need to change anything until it's running.
 }
 
 fn init_color_shot_slow_fade(trigger: &mut Trigger, global: &mut TimedRainbows) {

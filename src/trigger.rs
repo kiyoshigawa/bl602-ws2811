@@ -207,26 +207,6 @@ impl Trigger {
     }
 }
 
-fn flash(trigger: &mut Trigger, segment: &mut [Color]) {
-    let is_fade_in = trigger.frames.get_current() < trigger.transition_frame;
-
-    let mut progress;
-    let mut transition_frame = 0;
-    if is_fade_in {
-        progress = Progression::new(trigger.transition_frame);
-    } else {
-        progress = Progression::new(trigger.frames.total - trigger.transition_frame);
-        progress.reverse_direction();
-        transition_frame = trigger.transition_frame;
-    }
-
-    progress.set_current(trigger.frames.get_current() - transition_frame);
-
-    for led in segment {
-        *led = led.lerp_with(trigger.color, progress);
-    }
-}
-
 impl<'a, const N: usize> MarchingRainbow for TriggerCollection<'a, N> {
     fn rainbow(&self) -> &StatefulRainbow {
         &self.slow_fade_rainbow
@@ -236,11 +216,7 @@ impl<'a, const N: usize> MarchingRainbow for TriggerCollection<'a, N> {
     }
 }
 
-fn color_pulse(trigger: &mut Trigger, segment: &mut [Color]) {
-    if trigger.frames.is_first_frame() {
-        trigger.offset = get_random_offset();
-    }
-
+fn get_trigger_fade_progress(trigger: &mut Trigger) -> Progression {
     let is_fade_in = trigger.frames.get_current() < trigger.transition_frame;
 
     let mut progress;
@@ -254,9 +230,24 @@ fn color_pulse(trigger: &mut Trigger, segment: &mut [Color]) {
     }
 
     progress.set_current(trigger.frames.get_current() - transition_frame);
+    progress
+}
 
+fn flash(trigger: &mut Trigger, segment: &mut [Color]) {
+    let progress = get_trigger_fade_progress(trigger);
+
+    for led in segment {
+        *led = led.lerp_with(trigger.color, progress);
+    }
+}
+
+fn color_pulse(trigger: &mut Trigger, segment: &mut [Color]) {
+    let progress = get_trigger_fade_progress(trigger);
+
+    // the range will be always at least 1 led, up to pixels_per_pixel_group leds:
     let first_led_index = trigger.offset as usize / segment.len();
     let last_led_index = first_led_index + (trigger.pixels_per_pixel_group.min(1) - 1);
+
     for index in first_led_index..=last_led_index {
         let corrected_index = index % segment.len();
         segment[corrected_index] = segment[corrected_index].lerp_with(trigger.color, progress);

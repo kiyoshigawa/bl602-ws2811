@@ -79,20 +79,6 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
     }
 
     fn trigger(&mut self, params: &trigger::Parameters, frame_rate: Hertz) {
-        // let random_offset = (self.random_number_generator.next_u32() % MAX_OFFSET as u32) as u16;
-        let starting_color_bucket = params.starting_offset / Self::OFFSET_BETWEEN_LEDS;
-        let starting_color_offset = starting_color_bucket * Self::OFFSET_BETWEEN_LEDS;
-
-        // let init_color_shot_trigger = |color| AnimationTriggerState {
-        //     mode: params.mode,
-        //     current_frame: 0,
-        //     total_fade_in_frames: convert_ns_to_frames(params.step_time_ns, frame_rate),
-        //     total_fade_out_frames: 0, // not used with color shots, fade in represents step duration
-        //     direction: params.direction,
-        //     current_offset: starting_color_offset,
-        //     color,
-        // };
-
         match params.mode {
             trigger::Mode::NoTrigger => {}
             trigger::Mode::Background => {

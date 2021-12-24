@@ -2,8 +2,8 @@ use crate::animations::{Direction, MAX_OFFSET};
 use crate::colors;
 use crate::colors::Color;
 use crate::utility::{
-    convert_ns_to_frames, get_random_offset, shift_offset, MarchingRainbow, MarchingRainbowMut,
-    Progression, SlowFadeRainbow, StatefulRainbow, TimedRainbows,
+    convert_ns_to_frames, get_random_offset, shift_offset, FadeRainbow, MarchingRainbow,
+    MarchingRainbowMut, Progression, StatefulRainbow, TimedRainbows,
 };
 use arrayvec::ArrayVec;
 use embedded_time::rate::Hertz;
@@ -32,12 +32,12 @@ pub enum Mode {
     /// Fade in and out times can be adjusted separately.
     ColorPulse,
 
-    /// This will cause a pulse that slow fades to appear somewhere randomly along the led array.
+    /// This will cause a pulse that fades to appear somewhere randomly along the led array.
     /// It will fade in, then fade back out one time per trigger, and its color will match the
-    /// animation's global trigger slow fade speed setting.
+    /// animation's global trigger fade speed setting.
     /// All pulses will be the same color, and the color will change over time.
     /// Fade in and out times can be adjusted separately.
-    ColorPulseSlowFade,
+    ColorPulseFade,
 
     /// This will cause a pulse of to appear somewhere randomly along the led array.
     /// It will fade in, then fade back out one time per trigger.
@@ -49,12 +49,12 @@ pub enum Mode {
     /// The starting offset and direction can be specified manually.
     ColorShot,
 
-    /// This will cause colored pulses of a single slow-fading color to run down the LED strip.
+    /// This will cause colored pulses of a single fading color to run down the LED strip.
     /// It will fade in, then fade back out one time per trigger, and its color will match the
-    /// animation's global trigger slow fade speed setting.
+    /// animation's global trigger fade speed setting.
     /// All pulses will be the same color, and the color will change over time.
     /// Fade in and out times can be adjusted separately.
-    ColorShotSlowFade,
+    ColorShotFade,
 
     /// This will fire off color pulses with a new color for each pulse, in the order of the colors
     /// of a rainbow.
@@ -64,14 +64,14 @@ pub enum Mode {
     /// Fade in and out times can be adjusted separately.
     Flash,
 
-    /// This will flash all the LEDs to a single slow-fading color for a short time.
+    /// This will flash all the LEDs to a single fading color for a short time.
     /// It will fade in, then fade back out one time per trigger, and its color will match the
-    /// animation's global trigger slow fade speed setting.
+    /// animation's global trigger fade speed setting.
     /// All pulses will be the same color, and the color will change over time.
     /// Fade in and out times can be adjusted separately.
-    FlashSlowFade,
+    FlashFade,
 
-    /// This will flash all the LEDs to a single slow-fading color for a short time.
+    /// This will flash all the LEDs to a single fading color for a short time.
     /// Each flash will be a new color in the order of the rainbow.
     FlashRainbow,
 
@@ -85,20 +85,20 @@ impl Mode {
             Mode::Background => (None, None),
             Mode::Foreground => (None, None),
             Mode::ColorPulse => (Some(init_color_pulse), Some(color_pulse)),
-            Mode::ColorPulseSlowFade => (Some(init_color_pulse_slow_fade), Some(color_pulse)),
+            Mode::ColorPulseFade => (Some(init_color_pulse_fade), Some(color_pulse)),
             Mode::ColorPulseRainbow => (Some(init_color_pulse_rainbow), Some(color_pulse)),
             Mode::ColorShot => (Some(init_color_shot), Some(color_shot)),
-            Mode::ColorShotSlowFade => (Some(init_color_shot_slow_fade), Some(color_shot)),
+            Mode::ColorShotFade => (Some(init_color_shot_fade), Some(color_shot)),
             Mode::ColorShotRainbow => (Some(init_color_shot_rainbow), Some(color_shot)),
             Mode::Flash => (Some(init_flash), Some(flash)),
-            Mode::FlashSlowFade => (Some(init_flash_slow_fade), Some(flash)),
+            Mode::FlashFade => (Some(init_flash_fade), Some(flash)),
             Mode::FlashRainbow => (Some(init_flash_rainbow), Some(flash)),
             Mode::Custom((i, u)) => (i, u),
         }
     }
 }
 
-/// All triggers share a single rainbow / slow fade speed, which is configured in this struct
+/// All triggers share a single rainbow / fade speed, which is configured in this struct
 pub struct GlobalParameters<'a> {
     pub rainbow: colors::Rainbow<'a>,
     pub is_rainbow_forward: bool,
@@ -108,7 +108,7 @@ pub struct GlobalParameters<'a> {
 /// This holds all triggers and contains the variables that apply to all triggers simultaneously, and not just to
 /// individual running triggers.
 pub struct TriggerCollection<'a, const N: usize> {
-    pub slow_fade_rainbow: StatefulRainbow<'a>,
+    pub fade_rainbow: StatefulRainbow<'a>,
     pub incremental_rainbow: StatefulRainbow<'a>,
     pub frames: Progression,
     triggers: ArrayVec<Trigger, N>,
@@ -116,12 +116,12 @@ pub struct TriggerCollection<'a, const N: usize> {
 
 impl<'a, const N: usize> TriggerCollection<'a, N> {
     pub fn new(init: &GlobalParameters<'a>, frame_rate: Hertz) -> Self {
-        let slow_fade_rainbow = StatefulRainbow::new(init.rainbow, init.is_rainbow_forward);
+        let fade_rainbow = StatefulRainbow::new(init.rainbow, init.is_rainbow_forward);
         let incremental_rainbow = StatefulRainbow::new(init.rainbow, init.is_rainbow_forward);
         let frames = Progression::new(convert_ns_to_frames(init.duration_ns, frame_rate));
         let triggers = ArrayVec::new();
 
-        Self { slow_fade_rainbow, incremental_rainbow, frames, triggers }
+        Self { fade_rainbow, incremental_rainbow, frames, triggers }
     }
 
     pub fn add_trigger(&mut self, init: &Parameters, frame_rate: Hertz) {
@@ -132,7 +132,7 @@ impl<'a, const N: usize> TriggerCollection<'a, N> {
             initialize(
                 &mut new_trigger,
                 &mut TimedRainbows {
-                    slow_fade_rainbow: &mut self.slow_fade_rainbow,
+                    fade_rainbow: &mut self.fade_rainbow,
                     incremental_rainbow: &mut self.incremental_rainbow,
                     frames: &mut self.frames,
                 },
@@ -152,7 +152,7 @@ impl<'a, const N: usize> TriggerCollection<'a, N> {
             .retain(|t| t.frames.get_current() < t.frames.total - 1);
         let did_roll = self.frames.checked_increment();
         if did_roll {
-            self.slow_fade_rainbow.increment();
+            self.fade_rainbow.increment();
         }
     }
 }
@@ -275,8 +275,8 @@ fn init_color_pulse(trigger: &mut Trigger, _: &mut TimedRainbows) {
     trigger.offset = get_random_offset();
 }
 
-fn init_color_pulse_slow_fade(trigger: &mut Trigger, global: &mut TimedRainbows) {
-    trigger.color = global.calculate_slow_fade_color();
+fn init_color_pulse_fade(trigger: &mut Trigger, global: &mut TimedRainbows) {
+    trigger.color = global.calculate_fade_color();
     init_color_pulse(trigger, global);
 }
 
@@ -290,8 +290,8 @@ fn init_color_shot(_: &mut Trigger, _: &mut TimedRainbows) {
     // Don't need to change anything until it's running.
 }
 
-fn init_color_shot_slow_fade(trigger: &mut Trigger, global: &mut TimedRainbows) {
-    trigger.color = global.calculate_slow_fade_color();
+fn init_color_shot_fade(trigger: &mut Trigger, global: &mut TimedRainbows) {
+    trigger.color = global.calculate_fade_color();
     init_color_shot(trigger, global);
 }
 
@@ -305,9 +305,9 @@ fn init_flash(trigger: &mut Trigger, _: &mut TimedRainbows) {
     trigger.direction = Direction::Stopped;
 }
 
-fn init_flash_slow_fade(trigger: &mut Trigger, global: &mut TimedRainbows) {
+fn init_flash_fade(trigger: &mut Trigger, global: &mut TimedRainbows) {
     init_flash(trigger, global);
-    trigger.color = global.calculate_slow_fade_color();
+    trigger.color = global.calculate_fade_color();
 }
 
 fn init_flash_rainbow(trigger: &mut Trigger, global: &mut TimedRainbows) {

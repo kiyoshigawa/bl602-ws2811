@@ -1,8 +1,8 @@
 use crate::animations::{Direction, MAX_OFFSET};
 use crate::colors::{self, Color, Rainbow};
 use crate::utility::{
-    self, convert_ns_to_frames, get_random_offset, MarchingRainbow, MarchingRainbowMut,
-    Progression, SlowFadeRainbow, StatefulRainbow,
+    self, convert_ns_to_frames, get_random_offset, FadeRainbow, MarchingRainbow,
+    MarchingRainbowMut, Progression, StatefulRainbow,
 };
 use embedded_time::rate::Hertz;
 type BgUpdater = fn(&mut Background, &mut [Color]);
@@ -19,7 +19,7 @@ pub enum Mode {
     /// otherwise it does not change.
     Solid,
 
-    /// This will slowly fade all the leds as a single color fading through the colors of a rainbow.
+    /// This will fade all the leds as a single color fading through the colors of a rainbow.
     /// Color offset can be externally triggered to the next color in the rainbow, or will move
     /// at a constant rate, changing one color per `duration_ns` sized time step.
     SolidFade,
@@ -29,7 +29,7 @@ pub enum Mode {
     /// When externally triggered, it moves to a random offset.
     FillRainbow,
 
-    /// This will populate a rainbow like above, but it will animate it by slowly offsetting the
+    /// This will populate a rainbow like above, but it will animate it by offsetting the
     /// color pattern over time.
     /// When externally triggered, it moves to a random offset.
     FillRainbowRotate,
@@ -66,7 +66,7 @@ fn solid(bg: &mut Background, segment: &mut [Color]) {
 fn solid_fade(bg: &mut Background, segment: &mut [Color]) {
     handle_solid_trigger(bg);
     for led in segment {
-        *led = bg.calculate_slow_fade_color();
+        *led = bg.calculate_fade_color();
     }
 }
 
@@ -229,7 +229,7 @@ impl<'a> MarchingRainbowMut for Background<'a> {
     }
 }
 
-impl<'a> SlowFadeRainbow for Background<'a> {
+impl<'a> FadeRainbow for Background<'a> {
     fn rainbow(&self) -> &StatefulRainbow {
         &self.rainbow
     }

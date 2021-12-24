@@ -3,7 +3,7 @@ use crate::{
     colors,
     colors::{Color, Rainbow},
     utility::{
-        convert_ns_to_frames, MarchingRainbow, MarchingRainbowMut, Progression, SlowFadeRainbow,
+        convert_ns_to_frames, FadeRainbow, MarchingRainbow, MarchingRainbowMut, Progression,
         StatefulRainbow,
     },
 };
@@ -27,12 +27,12 @@ pub enum Mode {
     /// The foreground trigger will advance to the next color of the rainbow.
     MarqueeSolidFixed,
 
-    /// This will display a marquee style animation where the color of all the LEDs slowly fades
+    /// This will display a marquee style animation where the color of all the LEDs fades
     /// through the colors of a rainbow. It will advance to the next color if externally triggered.
     MarqueeFade,
 
     /// This will display a fixed pattern the same as a marquee chase animation that will only move
-    /// if the offset is changed manually where the color of all the LEDs slowly fades through the
+    /// if the offset is changed manually where the color of all the LEDs fades through the
     /// colors of a rainbow. It will advance to the next color if externally triggered.
     MarqueeFadeFixed,
 
@@ -61,31 +61,31 @@ impl Mode {
 fn marquee_solid(fg: &mut Foreground, segment: &mut [Color]) {
     handle_marquee_trigger(fg);
     fg.increment_marquee_step();
-    fg.fill_marquee(fg.current_slow_fade_color(), segment);
+    fg.fill_marquee(fg.current_fade_color(), segment);
 }
 
 fn marquee_solid_fixed(fg: &mut Foreground, segment: &mut [Color]) {
     handle_marquee_trigger(fg);
     set_marquee_toggle(fg, segment.len());
-    fg.fill_marquee(fg.current_slow_fade_color(), segment);
+    fg.fill_marquee(fg.current_fade_color(), segment);
 }
 
 fn marquee_fade(fg: &mut Foreground, segment: &mut [Color]) {
     handle_marquee_trigger(fg);
     fg.increment_marquee_step();
-    let color = fg.calculate_slow_fade_color();
+    let color = fg.calculate_fade_color();
     fg.fill_marquee(color, segment);
 }
 
 fn marquee_fade_fixed(fg: &mut Foreground, segment: &mut [Color]) {
     handle_marquee_trigger(fg);
     set_marquee_toggle(fg, segment.len());
-    let color = fg.calculate_slow_fade_color();
+    let color = fg.calculate_fade_color();
     fg.fill_marquee(color, segment);
 }
 
 fn vu_meter(fg: &mut Foreground, segment: &mut [Color]) {
-    fg.current_slow_fade_color();
+    fg.current_fade_color();
     let led_count = segment.len();
     let last_on_led = fg.offset as usize / led_count;
     for led in &mut segment[last_on_led..] {
@@ -213,7 +213,7 @@ impl<'a> MarchingRainbowMut for Foreground<'a> {
     }
 }
 
-impl<'a> SlowFadeRainbow for Foreground<'a> {
+impl<'a> FadeRainbow for Foreground<'a> {
     fn rainbow(&self) -> &StatefulRainbow {
         &self.rainbow
     }

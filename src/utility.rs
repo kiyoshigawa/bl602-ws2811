@@ -67,11 +67,11 @@ impl<'a> Index<usize> for ModdedRainbow<'a> {
     }
 }
 
-pub trait SlowFadeRainbow {
+pub trait FadeRainbow {
     fn rainbow(&self) -> &StatefulRainbow;
     fn frames(&self) -> &Progression;
 
-    fn calculate_slow_fade_color(&self) -> Color {
+    fn calculate_fade_color(&self) -> Color {
         let (rainbow, frames) = (self.rainbow(), self.frames());
 
         let current_color = rainbow.current_color();
@@ -82,7 +82,7 @@ pub trait SlowFadeRainbow {
         current_color.lerp_with(next_color, *frames)
     }
 
-    fn current_slow_fade_color(&self) -> Color {
+    fn current_fade_color(&self) -> Color {
         self.rainbow().current_color()
     }
 }
@@ -90,17 +90,6 @@ pub trait SlowFadeRainbow {
 pub trait MarchingRainbow {
     fn rainbow(&self) -> &StatefulRainbow;
     fn frames(&self) -> &Progression;
-
-    // fn calculate_slow_fade_color(&self) -> Color {
-    //     let (rainbow, frames) = (self.rainbow(), self.frames());
-
-    //     let current_color = rainbow.current_color();
-    //     if frames.total == 0 {
-    //         return current_color;
-    //     }
-    //     let next_color = rainbow.peek_next_color();
-    //     current_color.lerp_with(next_color, *frames)
-    // }
 
     fn current_rainbow_color(&self) -> Color {
         self.rainbow().current_color()
@@ -119,14 +108,14 @@ pub trait MarchingRainbowMut {
 }
 
 pub struct TimedRainbows<'a, 'b> {
-    pub slow_fade_rainbow: &'b mut StatefulRainbow<'a>,
+    pub fade_rainbow: &'b mut StatefulRainbow<'a>,
     pub incremental_rainbow: &'b mut StatefulRainbow<'a>,
     pub frames: &'b mut Progression,
 }
 
-impl<'a, 'b> SlowFadeRainbow for TimedRainbows<'a, 'b> {
+impl<'a, 'b> FadeRainbow for TimedRainbows<'a, 'b> {
     fn rainbow(&self) -> &StatefulRainbow {
-        self.slow_fade_rainbow
+        self.fade_rainbow
     }
     fn frames(&self) -> &Progression {
         self.frames

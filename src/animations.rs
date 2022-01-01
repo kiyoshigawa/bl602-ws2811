@@ -1,8 +1,6 @@
 use crate::colors::Color;
 use crate::{background, foreground, trigger};
 use embedded_time::rate::*;
-use rand::rngs::SmallRng;
-use rand::{RngCore, SeedableRng};
 
 /// Adjust MAX_NUM_* consts depending on RAM requirements:
 pub(crate) const MAX_NUM_ACTIVE_TRIGGERS: usize = 10;

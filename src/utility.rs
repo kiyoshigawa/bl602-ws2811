@@ -26,7 +26,7 @@ pub fn get_random_offset() -> u16 {
     riscv::register::mcycle::read64() as u16
 }
 
-fn get_color_at_offset(rainbow: &ModdedRainbow, subdivisions: usize, offset: u16) -> Color {
+fn get_color_at_offset(rainbow: &ReversibleRainbow, subdivisions: usize, offset: u16) -> Color {
     let rainbow_length = rainbow.len();
     let full_color_count = rainbow_length * subdivisions;
     let next_color_distance = MAX_OFFSET as usize / full_color_count;
@@ -59,18 +59,18 @@ pub fn shift_offset(starting_offset: u16, frames: Progression, direction: Direct
     (starting_offset + offset_shift) as u16
 }
 
-struct ModdedRainbow<'a> {
+pub struct ReversibleRainbow<'a> {
     backer: Rainbow<'a>,
     is_forward: bool,
 }
 
-impl<'a> ModdedRainbow<'a> {
+impl<'a> ReversibleRainbow<'a> {
     pub fn len(&self) -> usize {
         self.backer.len()
     }
 }
 
-impl<'a> Index<usize> for ModdedRainbow<'a> {
+impl<'a> Index<usize> for ReversibleRainbow<'a> {
     type Output = Color;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -155,23 +155,22 @@ impl<'a, 'b> MarchingRainbowMut for TimedRainbows<'a, 'b> {
 }
 
 pub struct StatefulRainbow<'a> {
-    pub backer: Rainbow<'a>,
+    pub backer: ReversibleRainbow<'a>,
     pub position: Progression,
 }
 
 impl<'a> StatefulRainbow<'a> {
     pub fn new(rainbow: &'a [Color], is_forward: bool) -> StatefulRainbow<'a> {
-        let mut position = Progression::new(rainbow.len());
-        position.is_forward = is_forward;
-
-        Self { backer: rainbow, position }
+        let position = Progression::new(rainbow.len());
+        let backer = ReversibleRainbow { backer: rainbow, is_forward };
+        Self { backer, position }
     }
 
     pub fn current_color(&self) -> Color {
         self.backer[self.position.get_current() as usize]
     }
 
-    fn decrement(&mut self) {
+    pub fn decrement(&mut self) {
         self.position.decrement();
     }
 

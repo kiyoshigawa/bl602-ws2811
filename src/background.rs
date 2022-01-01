@@ -73,7 +73,7 @@ fn solid_fade(bg: &mut Background, segment: &mut [Color]) {
 /// Fills the rainbow based on whatever value the offset is currently set to:
 fn fill_rainbow(bg: &mut Background, segment: &mut [Color]) {
     handle_rainbow_trigger(bg);
-    bg.fill_rainbow(bg.offset, bg.rainbow.backer, segment);
+    bg.fill_rainbow(bg.offset, segment);
 }
 
 fn fill_rainbow_rotate(bg: &mut Background, segment: &mut [Color]) {
@@ -84,7 +84,7 @@ fn fill_rainbow_rotate(bg: &mut Background, segment: &mut [Color]) {
     // addition of the set offset plus the frame offset as u32s to avoid going over u16::MAX,
     // then modulo back to a u16 value using MAX_OFFSET when done.
     let color_start_offset = utility::shift_offset(bg.offset, bg.frames, bg.direction);
-    bg.fill_rainbow(color_start_offset, bg.rainbow.backer, segment);
+    bg.fill_rainbow(color_start_offset, segment);
 }
 
 /// Sets the background to a random offset then resets the trigger
@@ -157,17 +157,15 @@ impl<'a> Background<'a> {
         segment.iter_mut().for_each(|led| *led = color);
     }
 
-    fn fill_rainbow(&mut self, start_offset: u16, rainbow: &[Color], segment: &mut [Color]) {
+    fn fill_rainbow(&mut self, start_offset: u16, segment: &mut [Color]) {
         let start_offset = start_offset as usize;
         let max_offset = MAX_OFFSET as usize;
         let led_count = segment.len();
+        let rainbow = &self.rainbow.backer;
         // Generate the LED Position. The LED positions are distributed evenly over
         // the entire range from 0..MAX_OFFSET, to increase the effective supersampling resolution of
         // the animation.
         let get_position = |led_index| led_index * (max_offset / led_count);
-
-        // Always start with the first color of the rainbow:
-        self.rainbow.reset();
 
         let rainbow_length = rainbow.len();
 

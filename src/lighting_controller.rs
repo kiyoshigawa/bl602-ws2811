@@ -27,10 +27,7 @@ where
         timer: &'a mut Timer,
     ) -> Self {
         let frame_rate = frame_rate.into();
-        let mut lc = LightingController { logical_strip, animations, frame_rate, timer };
-        // for animation in lc.animations.iter_mut() {
-        //     animation.init_total_animation_duration_frames(lc.frame_rate);
-        // }
+        let lc = LightingController { logical_strip, animations, frame_rate, timer };
         // calculate the period of the frame rate in nanoseconds
         let frame_period = 1_000_000_000_u64 / frame_rate.integer() as u64; // 1E9 Nanoseconds / Hz = Period in ns
 

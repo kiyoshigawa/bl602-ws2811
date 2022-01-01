@@ -99,8 +99,6 @@ impl<'a, const N_LED: usize> Animatable<'a> for Animation<'a, N_LED> {
 }
 
 impl<'a, const N_LED: usize> Animation<'a, N_LED> {
-    const OFFSET_BETWEEN_LEDS: u16 = MAX_OFFSET / N_LED as u16;
-
     pub fn new(
         parameters: AnimationParameters<'a>,
         translation_array: [usize; N_LED],

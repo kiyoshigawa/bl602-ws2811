@@ -1,5 +1,5 @@
-use crate::{animations as a, trigger};
-use crate::animations::AnimationType;
+use crate::trigger;
+use crate::animations::{Animatable, AnimationType};
 use crate::hardware::{HardwareController, PeriodicTimer};
 use crate::leds::ws28xx::LogicalStrip;
 use embedded_time::duration::Nanoseconds;
@@ -11,7 +11,7 @@ where
     Timer: PeriodicTimer,
 {
     logical_strip: LogicalStrip<'a>,
-    animations: [&'a mut dyn a::Animatable<'a>; N_ANI],
+    animations: [&'a mut dyn Animatable<'a>; N_ANI],
     frame_rate: Hertz,
     timer: &'a mut Timer,
 }
@@ -22,7 +22,7 @@ where
 {
     pub fn new(
         logical_strip: LogicalStrip<'a>,
-        animations: [&'a mut (dyn a::Animatable<'a> + 'a); N_ANI],
+        animations: [&'a mut dyn Animatable<'a>; N_ANI],
         frame_rate: impl Into<Hertz>,
         timer: &'a mut Timer,
     ) -> Self {
@@ -60,5 +60,9 @@ where
 
     pub fn set_offset(&mut self, animation_index: usize, a_type: AnimationType, offset: u16) {
         self.animations[animation_index].set_offset(a_type, offset);
+    }
+
+    pub fn replace_animation(&mut self, index: usize, new_anim: &'a mut dyn Animatable<'a>) {
+        self.animations[index] = new_anim;
     }
 }

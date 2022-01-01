@@ -256,7 +256,7 @@ fn color_pulse(trigger: &mut Trigger, segment: &mut [Color]) {
 }
 
 fn color_shot(trigger: &mut Trigger, segment: &mut [Color]) {
-    let current_offset = shift_offset(trigger.offset, trigger.frames) as usize;
+    let current_offset = shift_offset(trigger.offset, trigger.frames, trigger.direction) as usize;
     let offset_distance_between_leds = MAX_OFFSET as usize / segment.len();
 
     // the range will be always at least 1 led, up to pixels_per_pixel_group leds:

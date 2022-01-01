@@ -1,7 +1,7 @@
 use core::ops::Index;
 
 use crate::{
-    animations::MAX_OFFSET,
+    animations::{Direction, MAX_OFFSET},
     colors::{Color, Rainbow},
 };
 use embedded_time::{fixed_point::FixedPoint, rate::Hertz};
@@ -43,13 +43,19 @@ fn get_color_at_offset(rainbow: &ModdedRainbow, subdivisions: usize, offset: u16
     Color::color_lerp(factor as i32, 0, next_color_distance as i32, start_color, end_color)
 }
 
-pub fn shift_offset(starting_offset: u16, frames: Progression) -> u16 {
+pub fn shift_offset(starting_offset: u16, frames: Progression, direction: Direction) -> u16 {
     if frames.total == 0 {
         return starting_offset;
     }
-
+    let max_offset = MAX_OFFSET as usize;
     let starting_offset = starting_offset as usize;
-    let offset_shift = MAX_OFFSET as usize * frames.get_current() / frames.total;
+    let offset_shift = match direction {
+        Direction::Positive => max_offset * frames.get_current() / frames.total,
+        Direction::Negative => {
+            max_offset * (frames.total - frames.get_current()) / frames.total
+        },
+        Direction::Stopped => 0,
+    };
     (starting_offset + offset_shift) as u16
 }
 

@@ -83,7 +83,7 @@ fn fill_rainbow_rotate(bg: &mut Background, segment: &mut [Color]) {
     // current frame / total frames ratio to decide where to begin the rainbow. Need to do the
     // addition of the set offset plus the frame offset as u32s to avoid going over u16::MAX,
     // then modulo back to a u16 value using MAX_OFFSET when done.
-    let color_start_offset = utility::shift_offset(bg.offset, bg.frames);
+    let color_start_offset = utility::shift_offset(bg.offset, bg.frames, bg.direction);
     bg.fill_rainbow(color_start_offset, bg.rainbow.backer, segment);
 }
 

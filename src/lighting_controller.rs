@@ -7,8 +7,6 @@ use embedded_time::fixed_point::FixedPoint;
 use embedded_time::rate::Hertz;
 
 pub struct LightingController<'a, Timer, const N_ANI: usize>
-where
-    Timer: PeriodicTimer,
 {
     logical_strip: LogicalStrip<'a>,
     animations: [&'a mut dyn Animatable<'a>; N_ANI],

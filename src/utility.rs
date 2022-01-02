@@ -14,8 +14,10 @@ pub fn convert_ms_to_frames(millis: u64, frame_rate: Hertz) -> usize {
     (millis * frame_rate.integer() as u64 / 1_000_u64) as usize
 }
 
-pub fn default_translation_array<const N: usize>(start_at: usize) -> [usize; N] {
-    let mut result: [usize; N] = [0; N];
+/// Returns a translation array beginning with index `start_at` and
+/// incrementing until reaching the desired `SIZE`
+pub fn default_translation_array<const SIZE: usize>(start_at: usize) -> [usize; SIZE] {
+    let mut result: [usize; SIZE] = [0; SIZE];
     for (index, value) in result.iter_mut().enumerate() {
         *value = start_at + index;
     }

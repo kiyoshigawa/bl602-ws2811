@@ -44,7 +44,7 @@ fn main() -> ! {
         .set_clock_source(ClockSource::Fclk(&clocks), 160_000_000_u32.Hz());
 
     // The order of pins here needs to match the array of strips passed into LogicalStrip::new()
-    let pins: [DynamicPin; NUM_STRIPS] = [
+    let mut pins: [DynamicPin; NUM_STRIPS] = [
         &mut gpio_pins.pin0.into_pull_down_output(),
         &mut gpio_pins.pin3.into_pull_down_output(),
         &mut gpio_pins.pin1.into_pull_down_output(),
@@ -67,10 +67,11 @@ fn main() -> ! {
 
     writeln!(serial, "Debug Serial Initialized...\r").ok();
 
+    let mut memory_buffer = [0; NUM_LEDS * 3];
     let mut color_buffer: [c::Color; NUM_LEDS] = [c::Color::default(); NUM_LEDS];
-    let office_strip = strip::LogicalStrip::new(&mut color_buffer, &ALL_STRIPS);
+    let office_strip = strip::LogicalStrip::new(&mut memory_buffer, &mut color_buffer, &ALL_STRIPS);
 
-    let mut hc = HardwareController::new(pins, timer_ch0);
+    let mut hc = HardwareController::new(&mut pins, timer_ch0);
 
     let mut s_ta: [usize; NUM_LEDS_SOUTH_WALL] = [0; NUM_LEDS_SOUTH_WALL];
     for (index, value) in s_ta.iter_mut().enumerate() {

@@ -13,6 +13,20 @@ pub mod utility;
 
 use leds::ws28xx as strip;
 
+pub static mut PROFILE: arrayvec::ArrayVec<usize, 512> = arrayvec::ArrayVec::new_const();
+
+pub fn measure(start: usize) {
+    unsafe {
+        PROFILE.try_push(riscv::register::mcycle::read() - start).ok();
+    }
+}
+
+pub fn profile_average() -> usize {
+    unsafe {
+        PROFILE.iter().sum::<usize>() / 1.max(PROFILE.len())
+    }
+}
+
 // How many LEDs on each wall:
 pub const NUM_LEDS_SOUTH_WALL: usize = 34;
 pub const NUM_LEDS_EAST_WALL: usize = 49;

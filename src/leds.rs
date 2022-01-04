@@ -1,6 +1,8 @@
 pub mod ws28xx {
-    use crate::colors as c;
-    use crate::hardware::{HardwareController, PeriodicTimer};
+    use crate::{
+        colors as c,
+        hardware::{HardwareController, PeriodicTimer},
+    };
     use bitvec::prelude::*;
     use embedded_time::duration::*;
 
@@ -56,7 +58,7 @@ pub mod ws28xx {
             &self,
             hc: &mut HardwareController<T>,
             pin_index: usize,
-            bit_buffer: impl IntoIterator<Item = &'b bool>,
+            bit_buffer: impl IntoIterator<Item = bool>,
         ) where
             T: PeriodicTimer,
         {
@@ -69,22 +71,27 @@ pub mod ws28xx {
                 hc.periodic_wait();
             }
             // iterate over the bits and send them to the pin with appropriate timing
-            for bit in bit_buffer {
+            let mut bit_iter = bit_buffer.into_iter();
+            let mut next_bit = bit_iter.next();
+
+            // load the next bit during the longest pause
+            while let Some(bit) = next_bit {
+                hc.set_high(pin_index);
                 match bit {
                     true => {
                         // on for 2/3 of the total time:
-                        hc.set_high(pin_index);
-                        hc.periodic_wait();
+                        next_bit = bit_iter.next();
+                        while hc.periodic_check_timeout().is_err() {}
                         hc.periodic_wait();
                         hc.set_low(pin_index);
                         hc.periodic_wait();
                     }
                     false => {
                         // on for 1/3 of the total time:
-                        hc.set_high(pin_index);
                         hc.periodic_wait();
                         hc.set_low(pin_index);
-                        hc.periodic_wait();
+                        next_bit = bit_iter.next();
+                        while hc.periodic_check_timeout().is_err() {}
                         hc.periodic_wait();
                     }
                 }
@@ -93,13 +100,18 @@ pub mod ws28xx {
     }
 
     pub struct LogicalStrip<'a> {
-        pub color_buffer: &'a mut [c::Color],
-        pub strips: &'a [PhysicalStrip],
+        _byte_buffer: &'a mut [u8],
+        color_buffer: &'a mut [c::Color],
+        strips: &'a [PhysicalStrip],
     }
 
     impl<'a> LogicalStrip<'a> {
-        pub fn new(color_buffer: &'a mut [c::Color], strips: &'a [PhysicalStrip]) -> Self {
-            LogicalStrip { color_buffer, strips }
+        pub fn new(
+            byte_buffer: &'a mut [u8],
+            color_buffer: &'a mut [c::Color],
+            strips: &'a [PhysicalStrip],
+        ) -> Self {
+            LogicalStrip { color_buffer, strips, _byte_buffer: byte_buffer }
         }
 
         pub fn get_color_at_index(&self, index: usize) -> c::Color {
@@ -109,6 +121,41 @@ pub mod ws28xx {
         // this sets the color value in the color array at index:
         pub fn set_color_at_index(&mut self, index: usize, color: c::Color) {
             self.color_buffer[index].set_color(color);
+
+            let mut index = index;
+            let (belongs_to, start) = self.belongs_to(index);
+
+            let [r, g, b] = belongs_to.color_order.offsets();
+
+            let mut as_bytes = [0; 3];
+            as_bytes[r] = color.r;
+            as_bytes[g] = color.g;
+            as_bytes[b] = color.b;
+
+            if belongs_to.reversed {
+                let index_offset = index - start;
+                let reversed_index_offset = belongs_to.led_count - 1 - index_offset;
+                index = start + reversed_index_offset;
+            }
+
+            for i in 0..as_bytes.len() {
+                self._byte_buffer[(3 * index) + i] = as_bytes[i];
+            }
+        }
+
+        fn belongs_to(&self, index: usize) -> (&PhysicalStrip, usize) {
+            let (mut start, mut end) = (0, 0);
+
+            for strip in self.strips {
+                end += strip.led_count;
+
+                if index < end {
+                    return (strip, start);
+                };
+
+                start = end;
+            }
+            panic!("Index out of bounds");
         }
 
         // this fills the entire strip with a single color:
@@ -118,24 +165,25 @@ pub mod ws28xx {
             }
         }
 
-        pub fn colors_to_bytes(
-            &self,
-            colors: impl Iterator<Item = &'a c::Color>,
-            color_order: &ColorOrder,
-        ) -> [u8; crate::MAX_SINGLE_STRIP_BYTE_BUFFER_LENGTH] {
-            let mut byte_buffer = [0_u8; crate::MAX_SINGLE_STRIP_BYTE_BUFFER_LENGTH];
+        // this will iterate over all the strips and send the led data in series:
+        pub fn send_all_sequential<T>(&self, hc: &mut HardwareController<T>)
+        where
+            T: PeriodicTimer,
+        {
+            let mut start_index = 0;
 
-            // Set the bytes in the RGB order for this strip
-            let offsets = color_order.offsets();
+            for (pin_index, strip) in self.strips.iter().enumerate() {
+                let end_index = start_index + strip.led_count;
 
-            for (i, color) in colors.enumerate() {
-                let base = i * 3;
-                byte_buffer[base + offsets[0]] = color.r;
-                byte_buffer[base + offsets[1]] = color.g;
-                byte_buffer[base + offsets[2]] = color.b;
+                let start_byte_index = start_index * 3;
+                let end_byte_index = end_index * 3;
+                let bit_slice =
+                    Self::bytes_as_bit_slice(&self._byte_buffer[start_byte_index..end_byte_index]);
+
+                strip.send_bits(hc, pin_index, bit_slice.iter().by_val());
+
+                start_index = end_index;
             }
-
-            byte_buffer
         }
 
         // this takes an array of u8 color data and converts it into an array of bools

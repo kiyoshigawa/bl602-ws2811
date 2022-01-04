@@ -54,7 +54,7 @@ pub const BG_TEST: background::Parameters = background::Parameters {
     rainbow: c::R_ROYGBIV,
     direction: Direction::Positive,
     is_rainbow_forward: true,
-    duration_ns: 20_000_000_000,
+    duration_ns: 30_000_000_000,
     subdivisions: 0,
 };
 

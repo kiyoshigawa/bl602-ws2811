@@ -119,6 +119,7 @@ pub struct Parameters<'a> {
     pub pixels_per_pixel_group: usize,
 }
 
+#[allow(dead_code)]
 pub struct Foreground<'a> {
     // state
     pub offset: u16,

@@ -4,7 +4,58 @@ use crate::{
     animations::{Direction, MAX_OFFSET},
     colors::{Color, Rainbow},
 };
-use embedded_time::{fixed_point::FixedPoint, rate::Hertz};
+
+use bl602_hal as hal;
+use core::fmt::Write;
+use embedded_time::rate::*;
+use hal::{
+    clock::{Clocks, Strict, SysclkFreq, UART_PLL_FREQ},
+    gpio::*,
+    pac,
+    serial::*,
+    timer::*,
+};
+
+pub fn init_clocks(config: &mut ClkCfg) -> Clocks {
+    Strict::new()
+        .use_pll(40_000_000u32.Hz())
+        .sys_clk(SysclkFreq::Pll160Mhz)
+        .uart_clk(UART_PLL_FREQ.Hz())
+        .freeze(config)
+}
+
+pub fn init_timers(
+    timer: pac::TIMER,
+    clocks: &Clocks,
+) -> (ConfiguredTimerChannel0, ConfiguredTimerChannel1) {
+    let timers = timer.split();
+    let timer_ch0 = timers
+        .channel0
+        .set_clock_source(ClockSource::Fclk(&clocks), 160_000_000_u32.Hz());
+
+    let timer_ch1 = timers
+        .channel1
+        .set_clock_source(ClockSource::Fclk(&clocks), 160_000_000_u32.Hz());
+
+    (timer_ch0, timer_ch1)
+}
+
+pub fn init_usb_serial<MODE>(
+    uart: pac::UART,
+    clocks: Clocks,
+    baud_rate: Baud,
+    tx_pin: Pin16<MODE>,
+    rx_pin: Pin7<MODE>,
+    tx_mux: UartMux0<Uart0Cts>,
+    rx_mux: UartMux7<Uart0Cts>,
+) -> impl Write {
+    let tx = tx_pin.into_uart_sig0();
+    let rx = rx_pin.into_uart_sig7();
+    let tx_mux = tx_mux.into_uart0_tx();
+    let rx_mux = rx_mux.into_uart0_rx();
+
+    Serial::uart0(uart, Config::default().baudrate(baud_rate), ((tx, tx_mux), (rx, rx_mux)), clocks)
+}
 
 pub fn convert_ns_to_frames(nanos: u64, frame_rate: Hertz) -> usize {
     (nanos * frame_rate.integer() as u64 / 1_000_000_000_u64) as usize
@@ -28,23 +79,6 @@ pub fn get_random_offset() -> u16 {
     riscv::register::mcycle::read64() as u16
 }
 
-fn get_color_at_offset(rainbow: &ReversibleRainbow, subdivisions: usize, offset: u16) -> Color {
-    let rainbow_length = rainbow.len();
-    let full_color_count = rainbow_length * subdivisions;
-    let next_color_distance = MAX_OFFSET as usize / full_color_count;
-
-    let offset = offset as usize;
-    let factor = offset % next_color_distance;
-
-    let start_color_index = (offset / next_color_distance) % rainbow_length;
-    let start_color = rainbow[start_color_index];
-
-    let end_color_index = (start_color_index + 1) % rainbow_length;
-    let end_color = rainbow[end_color_index];
-
-    Color::color_lerp(factor as i32, 0, next_color_distance as i32, start_color, end_color)
-}
-
 pub fn shift_offset(starting_offset: u16, frames: Progression, direction: Direction) -> u16 {
     if frames.total == 0 {
         return starting_offset;
@@ -53,9 +87,7 @@ pub fn shift_offset(starting_offset: u16, frames: Progression, direction: Direct
     let starting_offset = starting_offset as usize;
     let offset_shift = match direction {
         Direction::Positive => max_offset * frames.get_current() / frames.total,
-        Direction::Negative => {
-            max_offset * (frames.total - frames.get_current()) / frames.total
-        },
+        Direction::Negative => max_offset * (frames.total - frames.get_current()) / frames.total,
         Direction::Stopped => 0,
     };
     (starting_offset + offset_shift) as u16

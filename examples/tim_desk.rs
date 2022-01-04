@@ -4,24 +4,18 @@
 use bl602_ws2811::*;
 
 use animations as a;
-use animations::{Animatable, Animation, AnimationParameters};
 use colors as c;
 use default_animations as da;
 use hardware::{DynamicPin, HardwareController};
 use leds::ws28xx as strip;
 use lighting_controller as lc;
+use utility as u;
 
 use core::fmt::Write;
 use embedded_time::rate::*;
 
 use bl602_hal as hal;
-use hal::{
-    clock::{Clocks, Strict, SysclkFreq, UART_PLL_FREQ},
-    gpio::*,
-    pac,
-    serial::*,
-    timer::*,
-};
+use hal::{gpio::*, pac};
 
 // use panic_halt as _;
 use panic_write::PanicHandler;
@@ -69,14 +63,14 @@ fn main() -> ! {
     let mut gpio = dp.GLB.split();
 
     // Set up all the clocks we need
-    let clocks = init_clocks(&mut gpio.clk_cfg);
+    let clocks = u::init_clocks(&mut gpio.clk_cfg);
 
     // configure our two timer channels
-    let (timer_ch0, mut timer_ch1) = init_timers(dp.TIMER, &clocks);
+    let (timer_ch0, mut timer_ch1) = u::init_timers(dp.TIMER, &clocks);
 
     // Set up uart output for debug printing. Since this microcontroller has a pin matrix,
     // we need to set up both the pins and the muxes
-    let serial = init_usb_serial(
+    let serial = u::init_usb_serial(
         dp.UART,
         clocks,
         2_000_000.Bd(),
@@ -105,17 +99,14 @@ fn main() -> ! {
 
     let mut hc = HardwareController::new(&mut pins, timer_ch0);
 
-    let mut t_a = utility::default_translation_array::<NUM_LEDS>(0);
+    let t_a = utility::default_translation_array::<NUM_LEDS>(0);
 
     // Make a single animation operating on the whole strip:
-    let mut a = Animation::new(da::ANI_TEST, t_a, 60.Hz());
+    let mut a = a::Animation::new(da::ANI_TEST, t_a, 60.Hz());
 
-    let animation_array: [&mut dyn Animatable; 1] = [&mut a];
+    let animation_array: [&mut dyn a::Animatable; 1] = [&mut a];
 
     let mut lc = lc::LightingController::new(strip, animation_array, 60_u32.Hz(), &mut timer_ch1);
-
-    // get a millisecond delay for use with test patterns:
-    // let mut d = bl602_hal::delay::McycleDelay::new(clocks.sysclk().0);
 
     let test_trigger = trigger::Parameters {
         mode: trigger::Mode::ColorShotRainbow,
@@ -126,62 +117,12 @@ fn main() -> ! {
         pixels_per_pixel_group: 1,
     };
 
-    // let mut i = 0_u16;
     let mut last_time = riscv::register::mcycle::read64();
     loop {
         lc.update(&mut hc);
-        // i = (i + 1) % a::MAX_OFFSET;
-        // lc.set_offset(0, a::AnimationType::Foreground, i);
-        if riscv::register::mcycle::read64() - last_time > 160_000_000 * 3 {
+        if riscv::register::mcycle::read64() - last_time > 160_000_000 {
             lc.trigger(0, &test_trigger);
             last_time = riscv::register::mcycle::read64();
         }
-        // d.delay_ms(1).ok();
     }
-}
-
-fn init_clocks(config: &mut ClkCfg) -> Clocks {
-    Strict::new()
-        .use_pll(40_000_000u32.Hz())
-        .sys_clk(SysclkFreq::Pll160Mhz)
-        .uart_clk(UART_PLL_FREQ.Hz())
-        .freeze(config)
-}
-
-fn init_timers(
-    timer: pac::TIMER,
-    clocks: &Clocks,
-) -> (ConfiguredTimerChannel0, ConfiguredTimerChannel1) {
-    let timers = timer.split();
-    let timer_ch0 = timers
-        .channel0
-        .set_clock_source(ClockSource::Fclk(&clocks), 160_000_000_u32.Hz());
-
-    let timer_ch1 = timers
-        .channel1
-        .set_clock_source(ClockSource::Fclk(&clocks), 160_000_000_u32.Hz());
-
-    (timer_ch0, timer_ch1)
-}
-
-fn init_usb_serial<MODE>(
-    uart: pac::UART,
-    clocks: Clocks,
-    baud_rate: Baud,
-    tx_pin: Pin16<MODE>,
-    rx_pin: Pin7<MODE>,
-    tx_mux: UartMux0<Uart0Cts>,
-    rx_mux: UartMux7<Uart0Cts>,
-) -> impl Write {
-    let tx = tx_pin.into_uart_sig0();
-    let rx = rx_pin.into_uart_sig7();
-    let tx_mux = tx_mux.into_uart0_tx();
-    let rx_mux = rx_mux.into_uart0_rx();
-
-    Serial::uart0(
-        uart,
-        Config::default().baudrate(baud_rate),
-        ((tx, tx_mux), (rx, rx_mux)),
-        clocks,
-    )
 }

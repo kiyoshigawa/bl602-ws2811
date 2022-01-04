@@ -9,17 +9,12 @@ use default_animations as da;
 use hardware::{DynamicPin, HardwareController};
 use leds::ws28xx as strip;
 use lighting_controller as lc;
+use utility as u;
 
 use bl602_hal as hal;
 use core::fmt::Write;
 use embedded_time::rate::*;
-use hal::{
-    clock::{Strict, SysclkFreq, UART_PLL_FREQ},
-    pac,
-    prelude::*,
-    serial::*,
-    timer::*,
-};
+use hal::{pac, prelude::*};
 use panic_write as _;
 use panic_write::PanicHandler;
 
@@ -58,49 +53,41 @@ pub const NUM_LEDS: usize = crate::get_total_num_leds(&ALL_STRIPS);
 
 #[riscv_rt::entry]
 fn main() -> ! {
+    // get the peripherals
     let dp = pac::Peripherals::take().unwrap();
-    let mut gpio_pins = dp.GLB.split();
+
+    // split out the parts
+    let mut gpio = dp.GLB.split();
 
     // Set up all the clocks we need
-    let clocks = Strict::new()
-        .use_pll(40_000_000u32.Hz())
-        .sys_clk(SysclkFreq::Pll160Mhz)
-        .uart_clk(UART_PLL_FREQ.Hz())
-        .freeze(&mut gpio_pins.clk_cfg);
+    let clocks = u::init_clocks(&mut gpio.clk_cfg);
 
-    let timers = dp.TIMER.split();
-    let timer_ch0 = timers
-        .channel0
-        .set_clock_source(ClockSource::Fclk(&clocks), 160_000_000_u32.Hz());
+    // configure our two timer channels
+    let (timer_ch0, mut timer_ch1) = u::init_timers(dp.TIMER, &clocks);
 
-    let mut timer_ch1 = timers
-        .channel1
-        .set_clock_source(ClockSource::Fclk(&clocks), 160_000_000_u32.Hz());
+    // Set up uart output for debug printing. Since this microcontroller has a pin matrix,
+    // we need to set up both the pins and the muxes
+    let serial = u::init_usb_serial(
+        dp.UART,
+        clocks,
+        2_000_000.Bd(),
+        gpio.pin16,
+        gpio.pin7,
+        gpio.uart_mux0,
+        gpio.uart_mux7,
+    );
+
+    // writes panic messages to serial to see where things went wrong
+    let mut serial = PanicHandler::new(serial);
+
+    writeln!(serial, "Debug Serial Initialized...\r").ok();
 
     // The order of pins here needs to match the array of strips passed into LogicalStrip::new()
     let mut pins: [DynamicPin; NUM_STRIPS] = [
-        &mut gpio_pins.pin0.into_pull_down_output(),
-        &mut gpio_pins.pin3.into_pull_down_output(),
-        &mut gpio_pins.pin1.into_pull_down_output(),
+        &mut gpio.pin0.into_pull_down_output(),
+        &mut gpio.pin3.into_pull_down_output(),
+        &mut gpio.pin1.into_pull_down_output(),
     ];
-
-    // Set up uart output for debug printing. Since this microcontroller has a pin matrix,
-    // we need to set up both the pins and the muxs
-    let pin16 = gpio_pins.pin16.into_uart_sig0();
-    let pin7 = gpio_pins.pin7.into_uart_sig7();
-    let mux0 = gpio_pins.uart_mux0.into_uart0_tx();
-    let mux7 = gpio_pins.uart_mux7.into_uart0_rx();
-
-    // Configure our UART to 2MBaud, and use the pins we configured above
-    let mut serial = Serial::uart0(
-        dp.UART,
-        Config::default().baudrate(2_000_000.Bd()),
-        ((pin16, mux0), (pin7, mux7)),
-        clocks,
-    );
-
-    let mut serial = PanicHandler::new(serial);
-    writeln!(serial, "Debug Serial Initialized...\r").ok();
 
     let mut memory_buffer = [0; NUM_LEDS * 3];
     let mut color_buffer: [c::Color; NUM_LEDS] = [c::Color::default(); NUM_LEDS];
@@ -138,9 +125,6 @@ fn main() -> ! {
     let mut lc =
         lc::LightingController::new(office_strip, animation_array, 60_u32.Hz(), &mut timer_ch1);
 
-    // get a millisecond delay for use with test patterns:
-    // let mut d = bl602_hal::delay::McycleDelay::new(clocks.sysclk().0);
-
     let test_trigger = trigger::Parameters {
         mode: trigger::Mode::ColorShotRainbow,
         direction: a::Direction::Positive,
@@ -150,16 +134,15 @@ fn main() -> ! {
         pixels_per_pixel_group: 1,
     };
 
-    // let mut i = 0_u16;
     let mut last_time = riscv::register::mcycle::read64();
     loop {
         lc.update(&mut hc);
-        // i = (i + 1) % a::MAX_OFFSET;
-        // lc.set_offset(0, a::AnimationType::Foreground, i);
-        if riscv::register::mcycle::read64() - last_time > 160_000_000 * 3 {
+        if riscv::register::mcycle::read64() - last_time > 160_000_000 {
             lc.trigger(0, &test_trigger);
+            lc.trigger(1, &test_trigger);
+            lc.trigger(2, &test_trigger);
+            lc.trigger(3, &test_trigger);
             last_time = riscv::register::mcycle::read64();
         }
-        // d.delay_ms(1).ok();
     }
 }

@@ -31,11 +31,11 @@ pub fn init_timers(
     let timers = timer.split();
     let timer_ch0 = timers
         .channel0
-        .set_clock_source(ClockSource::Fclk(&clocks), 160_000_000_u32.Hz());
+        .set_clock_source(ClockSource::Fclk(clocks), 160_000_000_u32.Hz());
 
     let timer_ch1 = timers
         .channel1
-        .set_clock_source(ClockSource::Fclk(&clocks), 160_000_000_u32.Hz());
+        .set_clock_source(ClockSource::Fclk(clocks), 160_000_000_u32.Hz());
 
     (timer_ch0, timer_ch1)
 }
@@ -101,6 +101,10 @@ pub struct ReversibleRainbow<'a> {
 impl<'a> ReversibleRainbow<'a> {
     pub fn len(&self) -> usize {
         self.backer.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.backer.is_empty()
     }
 }
 

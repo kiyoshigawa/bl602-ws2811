@@ -54,7 +54,7 @@ pub mod ws28xx {
     }
 
     impl PhysicalStrip {
-        pub fn send_bits<'b, T>(
+        pub fn send_bits<T>(
             &self,
             hc: &mut HardwareController<T>,
             pin_index: usize,
@@ -138,7 +138,7 @@ pub mod ws28xx {
                 index = start + reversed_index_offset;
             }
 
-            for i in 0..as_bytes.len() {
+            for (i, _) in as_bytes.into_iter().enumerate() {
                 self._byte_buffer[(3 * index) + i] = as_bytes[i];
             }
         }

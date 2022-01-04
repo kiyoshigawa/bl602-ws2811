@@ -126,10 +126,10 @@ fn main() -> ! {
         lc::LightingController::new(office_strip, animation_array, 60_u32.Hz(), &mut timer_ch1);
 
     let test_trigger = trigger::Parameters {
-        mode: trigger::Mode::ColorShotRainbow,
+        mode: trigger::Mode::ColorShotFade,
         direction: a::Direction::Positive,
-        fade_in_time_ns: 1_250_000_000,
-        fade_out_time_ns: 1_750_000_000,
+        fade_in_time_ns: 1_000_000_000,
+        fade_out_time_ns: 0,
         starting_offset: 0,
         pixels_per_pixel_group: 1,
     };

@@ -1,13 +1,12 @@
-use crate::trigger;
 use crate::animations::{Animatable, AnimationType};
 use crate::hardware::{HardwareController, PeriodicTimer};
 use crate::leds::ws28xx::LogicalStrip;
+use crate::trigger;
 use embedded_time::duration::Nanoseconds;
 use embedded_time::fixed_point::FixedPoint;
 use embedded_time::rate::Hertz;
 
-pub struct LightingController<'a, Timer, const N_ANI: usize>
-{
+pub struct LightingController<'a, Timer, const N_ANI: usize> {
     logical_strip: LogicalStrip<'a>,
     animations: [&'a mut dyn Animatable<'a>; N_ANI],
     frame_rate: Hertz,
@@ -48,7 +47,7 @@ where
                     self.logical_strip.set_color_at_index(index, color);
                 }
             }
-            hc.send_all_sequential(&mut self.logical_strip);
+            self.logical_strip.send_all_sequential(hc);
         }
     }
 

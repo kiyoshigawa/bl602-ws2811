@@ -60,7 +60,7 @@ pub const BG_TEST: background::Parameters = background::Parameters {
 
 /// This is an animation foreground struct used for testing
 pub const FG_TEST: foreground::Parameters = foreground::Parameters {
-    mode: foreground::Mode::MarqueeFade,
+    mode: foreground::Mode::NoForeground,
     rainbow: c::R_ROYGBIV,
     direction: Direction::Positive,
     is_rainbow_forward: true,

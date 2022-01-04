@@ -22,6 +22,39 @@ use hal::{
 };
 use panic_halt as _;
 
+// How many LEDs on each wall animation:
+pub const NUM_LEDS_SOUTH_WALL: usize = 34;
+pub const NUM_LEDS_EAST_WALL: usize = 49;
+pub const NUM_LEDS_NORTH_WALL: usize = 35;
+pub const NUM_LEDS_WEST_WALL: usize = 49;
+
+// individual strips:
+pub const CLOSET_STRIP: strip::PhysicalStrip = strip::PhysicalStrip {
+    led_count: 34,
+    reversed: false,
+    color_order: strip::ColorOrder::BRG,
+    strip_timings: strip::StripTimings::WS2812_ADAFRUIT,
+};
+pub const WINDOW_STRIP: strip::PhysicalStrip = strip::PhysicalStrip {
+    led_count: 74,
+    reversed: false,
+    color_order: strip::ColorOrder::BRG,
+    strip_timings: strip::StripTimings::WS2812_ADAFRUIT,
+};
+pub const DOOR_STRIP: strip::PhysicalStrip = strip::PhysicalStrip {
+    led_count: 59,
+    reversed: true,
+    color_order: strip::ColorOrder::BRG,
+    strip_timings: strip::StripTimings::WS2812_ADAFRUIT,
+};
+
+pub const NUM_STRIPS: usize = 3;
+// combined strip group, make sure your pins in main() are in the same order as the strip order here:
+pub const ALL_STRIPS: [strip::PhysicalStrip; NUM_STRIPS] = [CLOSET_STRIP, WINDOW_STRIP, DOOR_STRIP];
+
+// calculate the total number of LEDs from the above values:
+pub const NUM_LEDS: usize = crate::get_total_num_leds(&ALL_STRIPS);
+
 #[riscv_rt::entry]
 fn main() -> ! {
     let dp = pac::Peripherals::take().unwrap();
@@ -121,7 +154,7 @@ fn main() -> ! {
         lc.update(&mut hc);
         // i = (i + 1) % a::MAX_OFFSET;
         // lc.set_offset(0, a::AnimationType::Foreground, i);
-        if riscv::register::mcycle::read64() - last_time > 160_000_000 {
+        if riscv::register::mcycle::read64() - last_time > 160_000_000 * 3 {
             lc.trigger(0, &test_trigger);
             last_time = riscv::register::mcycle::read64();
         }

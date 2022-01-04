@@ -10,4 +10,4 @@ runner = "blash --port COM7 --monitor-baud 2000000 --"
 target = "riscv32imac-unknown-none-elf"
 
 [alias]
-flash = ["--color=always", "blflash", "--release", "--port=COM11"]
+flash = ["--color=always", "blflash", "--release", "--port=COM7"]

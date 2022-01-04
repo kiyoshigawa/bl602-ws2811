@@ -16,6 +16,7 @@ nb = "1.0.0"
 bitvec = { version = "0.22.3", default-features = false }
 rand = { version = "0.8.4", features = ["small_rng"], default-features = false }
 arrayvec = { version = "0.7.2", default-features = false }
+panic-write = "0.1.0"
 
 # You probably don't want to use a debug build, but lots of people accidentally do
 # give the code at least a low level of optimization

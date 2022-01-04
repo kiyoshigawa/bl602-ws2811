@@ -1,7 +1,8 @@
 pub mod ws28xx {
-    use crate::colors::Color;
-    use crate::hardware::{HardwareController, PeriodicTimer};
-    use crate::{colors as c, MAX_SINGLE_STRIP_BYTE_BUFFER_LENGTH};
+    use crate::{
+        colors as c,
+        hardware::{HardwareController, PeriodicTimer},
+    };
     use bitvec::prelude::*;
     use embedded_time::duration::*;
 
@@ -105,7 +106,11 @@ pub mod ws28xx {
     }
 
     impl<'a> LogicalStrip<'a> {
-        pub fn new(byte_buffer: &'a mut [u8], color_buffer: &'a mut [c::Color], strips: &'a [PhysicalStrip]) -> Self {
+        pub fn new(
+            byte_buffer: &'a mut [u8],
+            color_buffer: &'a mut [c::Color],
+            strips: &'a [PhysicalStrip],
+        ) -> Self {
             LogicalStrip { color_buffer, strips, _byte_buffer: byte_buffer }
         }
 
@@ -116,7 +121,6 @@ pub mod ws28xx {
         // this sets the color value in the color array at index:
         pub fn set_color_at_index(&mut self, index: usize, color: c::Color) {
             self.color_buffer[index].set_color(color);
-
 
             let mut index = index;
             let (belongs_to, start) = self.belongs_to(index);
@@ -145,7 +149,9 @@ pub mod ws28xx {
             for strip in self.strips {
                 end += strip.led_count;
 
-                if index < end { return (strip, start); };
+                if index < end {
+                    return (strip, start);
+                };
 
                 start = end;
             }
@@ -169,74 +175,15 @@ pub mod ws28xx {
             for (pin_index, strip) in self.strips.iter().enumerate() {
                 let end_index = start_index + strip.led_count;
 
-                let current_strip_colors = &self.color_buffer[start_index..end_index];
+                let start_byte_index = start_index * 3;
+                let end_byte_index = end_index * 3;
+                let bit_slice =
+                    Self::bytes_as_bit_slice(&self._byte_buffer[start_byte_index..end_byte_index]);
 
-                // let byte_count = strip.led_count * 3;
-
-                // let byte_buffer = match strip.reversed {
-                //     true => {
-                //         self.colors_to_bytes(current_strip_colors.iter().rev(), &strip.color_order)
-                //     }
-                //     false => self.colors_to_bytes(current_strip_colors.iter(), &strip.color_order),
-                // };
-
-
-                // let bit_slice = Self::bytes_as_bit_slice(&byte_buffer[..byte_count]);
-                // let start = riscv::register::mcycle::read();
-                // strip.send_bits(hc, pin_index, bit_slice.iter().by_ref());
-                // crate::measure(start);
-
-                let mut _forward;
-                let mut _reverse;
-                let colors: &mut dyn Iterator<Item = &Color> = match strip.reversed {
-                    true => {
-                        _reverse = current_strip_colors.iter().rev();
-                        &mut _reverse
-                    }
-                    false => {
-                        _forward = current_strip_colors.iter();
-                        &mut _forward
-                    }
-                };
-
-                let bits = colors
-                    .into_bytes(&strip.color_order)
-                    .into_bits();
-
-                let start = riscv::register::mcycle::read();
-                strip.send_bits(hc, pin_index, bits);
-                crate::measure(start);
-
-                // let bit_slice = Self::bytes_as_bit_slice(&self._byte_buffer);
-
-                // let start = riscv::register::mcycle::read();
-
-                // strip.send_bits(hc, pin_index, bit_slice.iter().by_ref());
-
-                // crate::measure(start);
+                strip.send_bits(hc, pin_index, bit_slice.iter().by_val());
 
                 start_index = end_index;
             }
-        }
-
-        fn colors_to_bytes(
-            &self,
-            colors: impl Iterator<Item = &'a c::Color>,
-            color_order: &ColorOrder,
-        ) -> [u8; MAX_SINGLE_STRIP_BYTE_BUFFER_LENGTH] {
-            let mut byte_buffer = [0_u8; MAX_SINGLE_STRIP_BYTE_BUFFER_LENGTH];
-
-            // Set the bytes in the RGB order for this strip
-            let offsets = color_order.offsets();
-
-            for (i, color) in colors.enumerate() {
-                let base = i * 3;
-                byte_buffer[base + offsets[0]] = color.r;
-                byte_buffer[base + offsets[1]] = color.g;
-                byte_buffer[base + offsets[2]] = color.b;
-            }
-
-            byte_buffer
         }
 
         // this takes an array of u8 color data and converts it into an array of bools
@@ -244,84 +191,4 @@ pub mod ws28xx {
             byte_buffer.view_bits::<Msb0>()
         }
     }
-
-    trait IntoByteIter {
-        fn into_bytes(self, color_order: &ColorOrder) -> ByteIter<Self> where Self: Sized;
-    }
-
-    impl<'a, I: Iterator<Item = &'a Color> + Sized> IntoByteIter for I {
-        fn into_bytes(self, color_order: &ColorOrder) -> ByteIter<Self> where Self: Sized {
-            ByteIter {
-                source: self,
-                offsets: color_order.offsets(),
-                byte_buffer: [0; 3],
-                index: 3,
-            }
-        }
-    }
-
-    struct ByteIter<T> {
-        source: T,
-        offsets: [usize; 3],
-        byte_buffer: [u8; 3],
-        index: usize,
-    }
-
-
-    impl<'a, T: Iterator<Item=&'a c::Color>> Iterator for ByteIter<T> {
-        type Item = u8;
-
-        fn next(&mut self) -> Option<Self::Item> {
-
-            if self.index > 2 {
-                let color = self.source.next()?;
-                self.byte_buffer[self.offsets[0]] = color.r;
-                self.byte_buffer[self.offsets[1]] = color.g;
-                self.byte_buffer[self.offsets[2]] = color.b;
-                self.index = 0;
-            }
-            let result = self.byte_buffer[self.index];
-            self.index += 1;
-
-            Some(result)
-        }
-    }
-
-
-    trait IntoBitIter {
-        fn into_bits(self) -> BitIter<Self> where Self: Sized;
-    }
-
-    impl<I: Iterator<Item=u8> + Sized> IntoBitIter for I {
-        fn into_bits(self) -> BitIter<Self> where Self: Sized {
-            BitIter {
-                source: self,
-                current_byte: 0,
-                mask: 0,
-            }
-        }
-    }
-
-    struct BitIter<T> {
-        source: T,
-        current_byte: u8,
-        mask: u8,
-    }
-
-    impl<T: Iterator<Item=u8>> Iterator for BitIter<T> {
-        type Item = bool;
-
-        fn next(&mut self) -> Option<Self::Item> {
-            if self.mask == 0 {
-                self.current_byte = self.source.next()?;
-                // Most signifigant bit
-                self.mask = 128;
-            }
-            let result = self.current_byte & self.mask;
-            // Most significant bit
-            self.mask >>= 1;
-            Some(result != 0)
-        }
-    }
-
 }

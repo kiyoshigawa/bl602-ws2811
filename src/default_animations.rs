@@ -72,7 +72,7 @@ pub const FG_TEST: foreground::Parameters = foreground::Parameters {
 
 /// This is an animation trigger struct used for testing
 pub const TRIGGER_TEST: trigger::GlobalParameters = trigger::GlobalParameters {
-    rainbow: c::R_DARK_YELLOW_PATTERN,
+    rainbow: c::R_T_3000K,
     is_rainbow_forward: true,
     duration_ns: 10_000_000_000,
 };

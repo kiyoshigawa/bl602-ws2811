@@ -128,9 +128,16 @@ pub mod ws28xx {
             let [r, g, b] = belongs_to.color_order.offsets();
 
             let mut as_bytes = [0; 3];
+
             as_bytes[r] = color.r;
             as_bytes[g] = color.g;
             as_bytes[b] = color.b;
+
+            if c::IS_GAMMA_CORRECTION_ENABLED {
+                as_bytes[r] = c::GAMMA8[color.r as usize];
+                as_bytes[g] = c::GAMMA8[color.g as usize];
+                as_bytes[b] = c::GAMMA8[color.b as usize];
+            }
 
             if belongs_to.reversed {
                 let index_offset = index - start;

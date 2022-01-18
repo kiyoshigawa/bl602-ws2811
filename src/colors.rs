@@ -1,4 +1,4 @@
-const IS_GAMMA_CORRECTION_ENABLED: bool = false;
+pub const IS_GAMMA_CORRECTION_ENABLED: bool = true;
 
 #[allow(dead_code)]
 #[derive(Default, Copy, Clone, Debug)]
@@ -98,7 +98,7 @@ pub const R_BLUE: Rainbow = &[C_BLUE];
 pub const R_BLUE_PURPLE: Rainbow = &[C_BLUE_PURPLE];
 pub const R_PURPLE: Rainbow = &[C_PURPLE];
 pub const R_DARK_PURPLE: Rainbow = &[C_DARK_PURPLE];
-pub const R_ROYGBIV: Rainbow = &[C_RED, C_YELLOW, C_GREEN, C_BLUE];
+pub const R_ROYGBIV: Rainbow = &[C_RED, C_ORANGE, C_YELLOW, C_GREEN, C_BLUE, C_DARK_PURPLE];
 pub const R_RYB: Rainbow = &[C_RED, C_OFF, C_YELLOW, C_OFF, C_BLUE, C_OFF];
 pub const R_OGP: Rainbow = &[C_ORANGE, C_OFF, C_GREEN, C_OFF, C_PURPLE, C_OFF];
 pub const R_RGB: Rainbow = &[C_RED, C_OFF, C_GREEN, C_OFF, C_BLUE, C_OFF];
@@ -108,6 +108,10 @@ pub const R_OB: Rainbow = &[C_ORANGE, C_OFF, C_DEEP_BLUE, C_OFF];
 pub const R_BW: Rainbow = &[C_BLUE, C_OFF, C_WHITE, C_OFF];
 pub const R_RW: Rainbow = &[C_RED, C_OFF, C_WHITE, C_OFF];
 pub const R_GW: Rainbow = &[C_GREEN, C_OFF, C_WHITE, C_OFF];
+pub const R_T_3000K: Rainbow = &[C_T_4000K];
+pub const R_T_3500K: Rainbow = &[C_T_4000K];
+pub const R_T_4000K: Rainbow = &[C_T_4000K];
+pub const R_T_5000K: Rainbow = &[C_T_4000K];
 
 pub const fn dark_pattern(base: Color) -> [Color; 6] {
     let mut colors = [C_OFF; 6];

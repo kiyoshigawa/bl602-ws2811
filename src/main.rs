@@ -126,10 +126,10 @@ fn main() -> ! {
         lc::LightingController::new(office_strip, animation_array, 60_u32.Hz(), &mut timer_ch1);
 
     let test_trigger = trigger::Parameters {
-        mode: trigger::Mode::ColorShotFade,
+        mode: trigger::Mode::ColorPulseFade,
         direction: a::Direction::Positive,
-        fade_in_time_ns: 1_000_000_000,
-        fade_out_time_ns: 0,
+        fade_in_time_ns: 500_000_000,
+        fade_out_time_ns: 1_500_000_000,
         starting_offset: 0,
         pixels_per_pixel_group: 1,
     };
@@ -137,7 +137,7 @@ fn main() -> ! {
     let mut last_time = riscv::register::mcycle::read64();
     loop {
         lc.update(&mut hc);
-        if riscv::register::mcycle::read64() - last_time > 160_000_000 {
+        if riscv::register::mcycle::read64() - last_time > 160_000_000 / 10 {
             lc.trigger(0, &test_trigger);
             lc.trigger(1, &test_trigger);
             lc.trigger(2, &test_trigger);

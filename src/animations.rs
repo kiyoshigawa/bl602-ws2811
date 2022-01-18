@@ -3,7 +3,7 @@ use crate::{background, foreground, trigger};
 use embedded_time::rate::*;
 
 /// Adjust MAX_NUM_* consts depending on RAM requirements:
-pub(crate) const MAX_NUM_ACTIVE_TRIGGERS: usize = 10;
+pub(crate) const MAX_NUM_ACTIVE_TRIGGERS: usize = 100;
 
 /// This is the maximum offset value for rotating animations. It's basically the supersampled
 /// resolution of the animation over the entire translation_array of leds.

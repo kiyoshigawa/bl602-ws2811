@@ -11,23 +11,14 @@ pub struct Color {
 impl Color {
     // new color object takes rgb color values:
     pub fn new(r: u8, g: u8, b: u8) -> Self {
-        let r = GAMMA8[r as usize];
-        let g = GAMMA8[g as usize];
-        let b = GAMMA8[b as usize];
         Color { r, g, b }
     }
 
     // change RGB color values for mutable color
     pub fn set_rgb(&mut self, r: u8, g: u8, b: u8) {
-        if IS_GAMMA_CORRECTION_ENABLED {
-            self.r = GAMMA8[r as usize];
-            self.g = GAMMA8[g as usize];
-            self.b = GAMMA8[b as usize];
-        } else {
-            self.r = r;
-            self.g = g;
-            self.b = b;
-        }
+        self.r = r;
+        self.g = g;
+        self.b = b;
     }
 
     // change RGB color values for mutable color
